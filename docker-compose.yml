@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  sdnproject:
+    image: sdnproject
+    build: .
+    volumes:
+    - ./sandbox:/sandbox
+    - ./images:/images
+    - ./init.sh:/init.sh
+    - ./wg.conf:/etc/wireguard/wg.conf
+    sysctls:
+    - net.ipv4.ip_forward=1
+    - net.ipv6.conf.default.forwarding=1
+    - net.ipv6.conf.all.forwarding=1
+    environment:
+    - CONTROL_PREFIX_V4=192.168.100
+    - LAN_PREFIX_V4=172.16
+    - LAN_PREFIX_V6=2a0b:4e07:c4
+    - TRANSIT_LINK_PREFIX_V4=192.168.63
+    - TRANSIT_LINK_PREFIX_V6=fd63
+    - IX_PREFIX_V4=192.168.70
+    - IX_PREFIX_V6=fd70
+    privileged: true
+    ports:
+    - 8181:8181

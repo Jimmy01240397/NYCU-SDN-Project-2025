@@ -1,0 +1,76 @@
+version: "3"
+
+services:
+  routeserver:
+    image: 'frr'
+    cap_add:
+    - NET_RAW
+    - NET_ADMIN
+    - SYS_ADMIN
+    build:
+      context: ./frr
+      dockerfile: Dockerfile
+    volumes:
+    - ./routeserver/frr:/etc/frr
+    #- ./tmp/frr:/etc/frr
+    - ./routeserver:/setup:ro
+    - ./routeserver/ssh:/root/.ssh:ro
+    command: "/bin/bash /setup/start.sh"
+    network_mode: "none"
+  host1:
+    image: 'host'
+    cap_add:
+    - NET_RAW
+    - NET_ADMIN
+    - SYS_ADMIN
+    build:
+      context: ./host
+      dockerfile: Dockerfile
+    volumes:
+    - ./host:/setup:ro
+    - ./host/ssh:/root/.ssh:ro
+    command: "/bin/bash /setup/start.sh"
+    network_mode: "none"
+  host2:
+    image: 'host'
+    cap_add:
+    - NET_RAW
+    - NET_ADMIN
+    - SYS_ADMIN
+    build:
+      context: ./host
+      dockerfile: Dockerfile
+    volumes:
+    - ./host:/setup:ro
+    - ./host/ssh:/root/.ssh:ro
+    command: "/bin/bash /setup/start.sh"
+    network_mode: "none"
+  onos:
+    image: onos
+    build:
+      context: ./onos
+      dockerfile: Dockerfile
+    cap_add:
+    - NET_RAW
+    - NET_ADMIN
+    - SYS_ADMIN
+    volumes:
+    - ./onos:/setup:ro
+    - /tmp/configs:/configs
+    environment:
+    - ONOS_APPS=drivers,fpm,openflow,gui2
+    - CONTROL_PREFIX_V4=${CONTROL_PREFIX_V4}
+    ports:
+    - 8181:8181
+    privileged: true
+    networks:
+      control:
+        ipv4_address: ${CONTROL_PREFIX_V4}.2
+
+networks:
+  control:
+    ipam:
+      config:
+        - subnet: ${CONTROL_PREFIX_V4}.0/28
+          gateway: ${CONTROL_PREFIX_V4}.4
+

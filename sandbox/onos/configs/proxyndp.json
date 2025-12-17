@@ -1,0 +1,239 @@
+{
+  "apps": {
+    "nycu.winlab.proxyndp": { 
+      "ProxyNDPACLConfig": {
+        "input": [
+          {
+            "type": "request",
+            "target": "${LAN_PREFIX_V4}.${ID}.1/32",
+            "rule": "replytargetmac",
+            "data": "d2:e0:74:31:de:15"
+          },
+          {
+            "type": "request",
+            "target": "${LAN_PREFIX_V6}:${ID}::1/128",
+            "rule": "replytargetmac",
+            "data": "d2:e0:74:31:de:15"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "${IX_PREFIX_V4}.${ID}/32",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "${IX_PREFIX_V4}.0/24",
+            "target": "${IX_PREFIX_V4}.${ID}/32",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "${CONTROL_PREFIX_V4}.1/32",
+            "target": "${CONTROL_PREFIX_V4}.0/24",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "${IX_PREFIX_V6}::${ID}/128",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "${IX_PREFIX_V6}::/64",
+            "target": "${IX_PREFIX_V6}::${ID}/128",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "target": "${LAN_PREFIX_V4}.${ID}.0/24",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "target": "${LAN_PREFIX_V6}:${ID}::/64",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "target": "${TRANSIT_LINK_PREFIX_V4}.0/24",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "target": "${TRANSIT_LINK_PREFIX_V6}::/64",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "target": "${IX_PREFIX_V4}.${ID}/32",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "target": "${IX_PREFIX_V6}::${ID}/128",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "target": "${CONTROL_PREFIX_V4}.1/32",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "target": "${CONTROL_PREFIX_V4}.0/24",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "rule": "accept"
+          }
+        ],
+        "output": [
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "target": "${LAN_PREFIX_V4}.${ID}.0/24",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "target": "${TRANSIT_LINK_PREFIX_V4}.0/24",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "target": "${LAN_PREFIX_V6}:${ID}::/64",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "target": "${TRANSIT_LINK_PREFIX_V6}::/64",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "${IX_PREFIX_V4}.${ID}/32",
+            "target": "${IX_PREFIX_V4}.0/24",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "${IX_PREFIX_V4}.0/24",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "${IX_PREFIX_V6}::${ID}/128",
+            "target": "${IX_PREFIX_V6}::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "${IX_PREFIX_V6}::/64",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "${CONTROL_PREFIX_V4}.0/24",
+            "target": "${CONTROL_PREFIX_V4}.1/32",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "${CONTROL_PREFIX_V4}.0/24",
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "sender": "${IX_PREFIX_V4}.0/24",
+            "target": "${IX_PREFIX_V4}.${ID}/32",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "sender": "${IX_PREFIX_V6}::/64",
+            "target": "${IX_PREFIX_V6}::${ID}/128",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "sender": "${CONTROL_PREFIX_V4}.1/32",
+            "target": "${CONTROL_PREFIX_V4}.0/24",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "rule": "deny"
+          }
+        ]
+      }
+    }
+  }
+}
