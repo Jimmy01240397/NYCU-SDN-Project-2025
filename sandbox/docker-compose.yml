@@ -12,7 +12,7 @@ services:
       dockerfile: Dockerfile
     volumes:
     - ./routeserver/frr:/etc/frr
-    #- ./tmp/frr:/etc/frr
+    #- ./tmp/routeserver/frr:/etc/frr
     - ./routeserver:/setup:ro
     - ./routeserver/ssh:/root/.ssh:ro
     command: "/bin/bash /setup/start.sh"
@@ -66,11 +66,71 @@ services:
     networks:
       control:
         ipv4_address: ${CONTROL_PREFIX_V4}.2
+  
 
+  transitrouter:
+    image: 'frr'
+    cap_add:
+    - NET_RAW
+    - NET_ADMIN
+    - SYS_ADMIN
+    build:
+      context: ./frr
+      dockerfile: Dockerfile
+    sysctls:
+    - net.ipv4.ip_forward=1
+    - net.ipv6.conf.default.forwarding=1
+    - net.ipv6.conf.all.forwarding=1
+    - net.ipv6.conf.all.proxy_ndp=1
+    - net.ipv6.conf.all.accept_ra=2
+    volumes:
+    - ./transitrouter/frr:/etc/frr
+    #- ./tmp/transitrouter/frr:/etc/frr
+    - ./transitrouter:/setup:ro
+    - ./transitrouter/ssh:/root/.ssh:ro
+    command: "/bin/bash /setup/start.sh"
+    networks:
+      transitlan:
+        ipv4_address: ${TRANSIT_PREFIX_V4}.${ID}.1
+        ipv6_address: ${TRANSIT_PREFIX_V6}${ID}::1
+  
+  transithost1:
+    image: 'host'
+    cap_add:
+    - NET_RAW
+    - NET_ADMIN
+    - SYS_ADMIN
+    build:
+      context: ./host
+      dockerfile: Dockerfile
+    volumes:
+    - ./host:/setup:ro
+    - ./host/ssh:/root/.ssh:ro
+    environment:
+    - GATEWAY_V4=${TRANSIT_PREFIX_V4}.${ID}.1
+    - GATEWAY_V6=${TRANSIT_PREFIX_V6}${ID}::1
+    - GATEWAY_IFACE=eth0
+    command: "/bin/bash /setup/start.sh"
+    networks:
+      transitlan:
+        ipv4_address: ${TRANSIT_PREFIX_V4}.${ID}.2
+        ipv6_address: ${TRANSIT_PREFIX_V6}${ID}::2
+    
 networks:
   control:
+    driver_opts:
+      com.docker.network.driver.mtu: ${MTU}
     ipam:
       config:
         - subnet: ${CONTROL_PREFIX_V4}.0/28
           gateway: ${CONTROL_PREFIX_V4}.4
-
+  transitlan:
+    enable_ipv6: true
+    driver_opts:
+      com.docker.network.driver.mtu: ${MTU}
+    ipam:
+      config:
+        - subnet: ${TRANSIT_PREFIX_V4}.${ID}.0/24
+          gateway: ${TRANSIT_PREFIX_V4}.${ID}.254
+        - subnet: ${TRANSIT_PREFIX_V6}${ID}::/64
+          gateway: ${TRANSIT_PREFIX_V6}${ID}:ffff:ffff:ffff:ffff

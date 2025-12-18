@@ -9,11 +9,13 @@ services:
     - ./images:/images
     - ./init.sh:/init.sh
     - ./wg.conf:/etc/wireguard/wg.conf
+    - ./daemon.json:/etc/docker/daemon.json
     sysctls:
     - net.ipv4.ip_forward=1
     - net.ipv6.conf.default.forwarding=1
     - net.ipv6.conf.all.forwarding=1
     environment:
+    - MTU=1370
     - CONTROL_PREFIX_V4=192.168.100
     - LAN_PREFIX_V4=172.16
     - LAN_PREFIX_V6=2a0b:4e07:c4
@@ -21,6 +23,20 @@ services:
     - TRANSIT_LINK_PREFIX_V6=fd63
     - IX_PREFIX_V4=192.168.70
     - IX_PREFIX_V6=fd70
+    - TRANSIT_PREFIX_V4=172.17
+    - TRANSIT_PREFIX_V6=2a0b:4e07:c4:1
+    - LEFT_VNI=
+    - LEFT_REMOTE_IP=
+    - LEFT_IP_V4=
+    - LEFT_IP_V6=
+    - LEFT_PEER_IP_V4=
+    - LEFT_PEER_IP_V6=
+    - RIGHT_VNI=
+    - RIGHT_REMOTE_IP=
+    - RIGHT_IP_V4=
+    - RIGHT_IP_V6=
+    - RIGHT_PEER_IP_V4=
+    - RIGHT_PEER_IP_V6=
     privileged: true
     ports:
     - 8181:8181
