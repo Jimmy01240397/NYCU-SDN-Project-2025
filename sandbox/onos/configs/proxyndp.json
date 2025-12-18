@@ -22,8 +22,8 @@
             "device": "ovs2",
             "port": 1,
             "type": "request",
-            "sender": "${CONTROL_PREFIX_V4}.1/32",
-            "target": "${CONTROL_PREFIX_V4}.0/24",
+            "sender": "${DUMMY_PREFIX_V4}.1/32",
+            "target": "${DUMMY_PREFIX_V4}.0/24",
             "rule": "accept"
           },
           {
@@ -105,14 +105,14 @@
             "device": "ovs2",
             "port": 1,
             "type": "reply",
-            "target": "${CONTROL_PREFIX_V4}.1/32",
+            "target": "${DUMMY_PREFIX_V4}.1/32",
             "rule": "accept"
           },
           {
             "device": "ovs2",
             "port": 1,
             "type": "reply",
-            "target": "${CONTROL_PREFIX_V4}.0/24",
+            "target": "${DUMMY_PREFIX_V4}.0/24",
             "rule": "deny"
           },
           {
@@ -185,15 +185,15 @@
             "device": "ovs2",
             "port": 1,
             "type": "request",
-            "sender": "${CONTROL_PREFIX_V4}.0/24",
-            "target": "${CONTROL_PREFIX_V4}.1/32",
+            "sender": "${DUMMY_PREFIX_V4}.0/24",
+            "target": "${DUMMY_PREFIX_V4}.1/32",
             "rule": "accept"
           },
           {
             "device": "ovs2",
             "port": 1,
             "type": "request",
-            "sender": "${CONTROL_PREFIX_V4}.0/24",
+            "sender": "${DUMMY_PREFIX_V4}.0/24",
             "rule": "deny"
           },
           {
@@ -222,8 +222,8 @@
             "device": "ovs2",
             "port": 1,
             "type": "reply",
-            "sender": "${CONTROL_PREFIX_V4}.1/32",
-            "target": "${CONTROL_PREFIX_V4}.0/24",
+            "sender": "${DUMMY_PREFIX_V4}.1/32",
+            "target": "${DUMMY_PREFIX_V4}.0/24",
             "rule": "accept"
           },
           {

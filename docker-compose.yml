@@ -16,7 +16,8 @@ services:
     - net.ipv6.conf.all.forwarding=1
     environment:
     - MTU=1370
-    - CONTROL_PREFIX_V4=192.168.100
+    - CONTROL_PREFIX_V4=192.168.101
+    - DUMMY_PREFIX_V4=192.168.100
     - LAN_PREFIX_V4=172.16
     - LAN_PREFIX_V6=2a0b:4e07:c4
     - TRANSIT_LINK_PREFIX_V4=192.168.63

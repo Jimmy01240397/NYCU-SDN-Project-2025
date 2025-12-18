@@ -18,8 +18,6 @@ init_apps() {
     done
 }
 
-ip addr add ${CONTROL_PREFIX_V4}.10/28 dev eth0
-
 init_apps &
 
 cd /root/onos

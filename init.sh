@@ -2,8 +2,8 @@
 
 wg-quick up wg
 
-ovs-vsctl add-br ovs1 -- set bridge ovs1 protocols=OpenFlow14 -- set-controller ovs1 tcp:${CONTROL_PREFIX_V4}.10:6653 -- set-fail-mode ovs1 secure
-ovs-vsctl add-br ovs2 -- set bridge ovs2 protocols=OpenFlow14 -- set-controller ovs2 tcp:${CONTROL_PREFIX_V4}.10:6653 -- set-fail-mode ovs2 secure
+ovs-vsctl add-br ovs1 -- set bridge ovs1 protocols=OpenFlow14 -- set-controller ovs1 tcp:localhost:6653 -- set-fail-mode ovs1 secure
+ovs-vsctl add-br ovs2 -- set bridge ovs2 protocols=OpenFlow14 -- set-controller ovs2 tcp:localhost:6653 -- set-fail-mode ovs2 secure
 
 ip link set dev ovs1 up
 ip link set dev ovs2 up
@@ -67,13 +67,11 @@ done
 
 docker compose -p sandbox up -d
 
-ip link add ovs2tobr type veth peer name brtoovs2
-ip link set ovs2tobr up
-ip link set brtoovs2 up
-ovs-vsctl add-port ovs2 ovs2tobr
-brctl addif br-$(docker network ls | grep 'sandbox_control' | awk '{print $1}') brtoovs2
-
-ebtables -A FORWARD -o brtoovs2 -p arp --arp-ip-src ${CONTROL_PREFIX_V4}.10 -j DROP
+ip link add ovs2todummy type veth peer name dummytoovs2
+ip link set ovs2todummy up
+ip link set dummytoovs2 up
+ovs-vsctl add-port ovs2 ovs2todummy
+ip addr add ${DUMMY_PREFIX_V4}.2/28 dev dummytoovs2
 
 ovs-docker add-port ovs2 eth0 sandbox-host1-1 --ipaddress=${LAN_PREFIX_V4}.${ID}.2/24 --gateway=${LAN_PREFIX_V4}.${ID}.1
 docker compose exec host1 ip link set eth0 mtu ${MTU}
@@ -89,7 +87,7 @@ ovs-docker add-port ovs1 eth0 sandbox-routeserver-1 --ipaddress=${LAN_PREFIX_V4}
 docker compose exec routeserver ip link set eth0 mtu ${MTU}
 docker compose exec routeserver ip -4 addr add ${TRANSIT_LINK_PREFIX_V4}.1/24 dev eth0
 docker compose exec routeserver ip -4 addr add ${IX_PREFIX_V4}.${ID}/24 dev eth0
-docker compose exec routeserver ip -4 addr add ${CONTROL_PREFIX_V4}.3/24 dev eth0
+docker compose exec routeserver ip -4 addr add ${DUMMY_PREFIX_V4}.3/24 dev eth0
 docker compose exec routeserver ip -6 addr add ${TRANSIT_LINK_PREFIX_V6}::1/64 dev eth0
 docker compose exec routeserver ip -6 addr add ${IX_PREFIX_V6}::${ID}/64 dev eth0
 docker compose exec routeserver ip -6 addr add ${LAN_PREFIX_V6}:${ID}::69/64 dev eth0

@@ -59,13 +59,13 @@ services:
     - /tmp/configs:/configs
     environment:
     - ONOS_APPS=drivers,fpm,openflow,gui2
-    - CONTROL_PREFIX_V4=${CONTROL_PREFIX_V4}
     ports:
+    - 6653:6653
     - 8181:8181
     privileged: true
     networks:
       control:
-        ipv4_address: ${CONTROL_PREFIX_V4}.2
+        ipv4_address: ${CONTROL_PREFIX_V4}.1
   
 
   transitrouter:
@@ -122,8 +122,8 @@ networks:
       com.docker.network.driver.mtu: ${MTU}
     ipam:
       config:
-        - subnet: ${CONTROL_PREFIX_V4}.0/28
-          gateway: ${CONTROL_PREFIX_V4}.4
+        - subnet: ${CONTROL_PREFIX_V4}.0/24
+          gateway: ${CONTROL_PREFIX_V4}.254
   transitlan:
     enable_ipv6: true
     driver_opts:
