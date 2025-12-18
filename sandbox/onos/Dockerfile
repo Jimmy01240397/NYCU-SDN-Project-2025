@@ -1,6 +1,6 @@
 FROM onosproject/onos:2.7-latest
 
-RUN apt update && apt install sudo jq maven build-essential bzip2 git unzip zip python3 arping iputils-ping iproute2 -y
+RUN apt update && apt install sudo jq maven build-essential bzip2 git unzip zip python3 arping iputils-ping iproute2 mtr -y
 
 COPY install_jdk /install_jdk
 

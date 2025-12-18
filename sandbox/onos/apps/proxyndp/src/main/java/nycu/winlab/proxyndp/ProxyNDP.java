@@ -131,7 +131,7 @@ public class ProxyNDP {
         cfgService.addListener(cfgListener);
         cfgService.registerConfigFactory(factory);
         processor = new DiscoverPacketProcessor();
-        packetService.addProcessor(processor, PacketProcessor.director(2));
+        packetService.addProcessor(processor, PacketProcessor.director(1));
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchEthType(Ethernet.TYPE_ARP);
         packetService.requestPackets(selector.build(), PacketPriority.REACTIVE, appId);
@@ -301,93 +301,97 @@ public class ProxyNDP {
             } else {
                 return;
             }
-            if (isrequest) {
-                ConnectPoint frompoint = new ConnectPoint(deviceId, fromport);
-                if (!aclcheck(ethPkt, frompoint, "input", discoverentry, true)) {
-                    return;
-                }
-                newdiscovercache(discoverentry.getSenderIp(), new CacheData(discoverentry.getSenderMac(),
-                            discoverentry.getOption()));
-                CacheData targetcache = getdiscovercache(discoverentry.getTargetIp());
-                if (targetcache == null) {
-                    boolean cacheresult = newmaccache(context);
-                    byte[] data = ethPkt.serialize();
-
-                    Set<ConnectPoint> nonEdge = new HashSet<>();
-                    for (Link link : linkService.getLinks()) {
-                        nonEdge.add(link.src());
-                        nonEdge.add(link.dst());
+            try {
+                if (isrequest) {
+                    ConnectPoint frompoint = new ConnectPoint(deviceId, fromport);
+                    if (!aclcheck(ethPkt, frompoint, "input", discoverentry, true)) {
+                        return;
                     }
-                    for (Device device : deviceService.getDevices()) {
-                        for (Port port : deviceService.getPorts(device.id())) {
-                            ConnectPoint outpoint = new ConnectPoint(device.id(), port.number());
-                            if (port.number().equals(PortNumber.LOCAL) ||
-                                outpoint.equals(frompoint) ||
-                                nonEdge.contains(outpoint)) {
-                                continue;
-                            }
-                            if (!aclcheck(ethPkt, outpoint, "output", discoverentry, true)) {
-                                continue;
-                            }
-                            TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                                .setOutput(port.number())
-                                .build();
-                            OutboundPacket outPkt = new DefaultOutboundPacket(
-                                    device.id(),
-                                    treatment,
-                                    ByteBuffer.wrap(data)
-                            );
-                            packetService.emit(outPkt);
+                    newdiscovercache(discoverentry.getSenderIp(), new CacheData(discoverentry.getSenderMac(),
+                                discoverentry.getOption()));
+                    CacheData targetcache = getdiscovercache(discoverentry.getTargetIp());
+                    if (targetcache == null) {
+                        boolean cacheresult = newmaccache(context);
+                        byte[] data = ethPkt.serialize();
+
+                        Set<ConnectPoint> nonEdge = new HashSet<>();
+                        for (Link link : linkService.getLinks()) {
+                            nonEdge.add(link.src());
+                            nonEdge.add(link.dst());
                         }
-                    }
-                    if (cacheresult) {
-                        log.info("{} TABLE MISS. Send {} to edge ports", pkttype, requestmsg);
-                    }
-                } else if (!targetcache.getMac().equals(discoverentry.getSenderMac())) {
-                    ConnectPoint outpoint = new ConnectPoint(deviceId, fromport);
+                        for (Device device : deviceService.getDevices()) {
+                            for (Port port : deviceService.getPorts(device.id())) {
+                                ConnectPoint outpoint = new ConnectPoint(device.id(), port.number());
+                                if (port.number().equals(PortNumber.LOCAL) ||
+                                    outpoint.equals(frompoint) ||
+                                    nonEdge.contains(outpoint)) {
+                                    continue;
+                                }
+                                if (!aclcheck(ethPkt, outpoint, "output", discoverentry, true)) {
+                                    continue;
+                                }
+                                TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                                    .setOutput(port.number())
+                                    .build();
+                                OutboundPacket outPkt = new DefaultOutboundPacket(
+                                        device.id(),
+                                        treatment,
+                                        ByteBuffer.wrap(data)
+                                );
+                                packetService.emit(outPkt);
+                            }
+                        }
+                        if (cacheresult) {
+                            log.info("{} TABLE MISS. Send {} to edge ports", pkttype, requestmsg);
+                        }
+                    } else if (!targetcache.getMac().equals(discoverentry.getSenderMac())) {
+                        ConnectPoint outpoint = new ConnectPoint(deviceId, fromport);
 
-                    discoverentry.setTargetMac(targetcache.getMac());
-                    discoverentry.setOption(targetcache.getOption());
-                    Ethernet ethReply = discoverentry.buildReply(ethPkt);
+                        discoverentry.setTargetMac(targetcache.getMac());
+                        discoverentry.setOption(targetcache.getOption());
+                        Ethernet ethReply = discoverentry.buildReply(ethPkt);
 
-                    if (!aclcheck(ethReply, outpoint, "output", discoverentry, false)) {
+                        if (!aclcheck(ethReply, outpoint, "output", discoverentry, false)) {
+                            return;
+                        }
+
+                        TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(fromport).build();
+                        OutboundPacket outPkt = new DefaultOutboundPacket(
+                                deviceId,
+                                treatment,
+                                ByteBuffer.wrap(ethReply.serialize())
+                        );
+                        packetService.emit(outPkt);
+                        log.info("{} TABLE HIT. Requested MAC = {}", pkttype, discoverentry.getTargetMac());
+                    }
+                } else {
+                    ConnectPoint frompoint = new ConnectPoint(deviceId, fromport);
+                    if (!aclcheck(ethPkt, frompoint, "input", discoverentry, false)) {
                         return;
                     }
-
-                    TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(fromport).build();
-                    OutboundPacket outPkt = new DefaultOutboundPacket(
-                            deviceId,
-                            treatment,
-                            ByteBuffer.wrap(ethReply.serialize())
-                    );
-                    packetService.emit(outPkt);
-                    log.info("{} TABLE HIT. Requested MAC = {}", pkttype, discoverentry.getTargetMac());
-                }
-            } else {
-                ConnectPoint frompoint = new ConnectPoint(deviceId, fromport);
-                if (!aclcheck(ethPkt, frompoint, "input", discoverentry, false)) {
-                    return;
-                }
-                newdiscovercache(discoverentry.getTargetIp(), new CacheData(discoverentry.getTargetMac(),
-                            discoverentry.getOption()));
-                log.info("{} RECV REPLY. Requested MAC = {}", pkttype, discoverentry.getTargetMac());
-                HostEntry dst = getmaccache(discoverentry);
-                if (dst != null) {
-                    ConnectPoint outpoint = new ConnectPoint(dst.getDeviceId(), dst.getPort());
-                    if (!aclcheck(ethPkt, outpoint, "output", discoverentry, false)) {
-                        return;
+                    newdiscovercache(discoverentry.getTargetIp(), new CacheData(discoverentry.getTargetMac(),
+                                discoverentry.getOption()));
+                    log.info("{} RECV REPLY. Requested MAC = {}", pkttype, discoverentry.getTargetMac());
+                    HostEntry dst = getmaccache(discoverentry);
+                    if (dst != null) {
+                        ConnectPoint outpoint = new ConnectPoint(dst.getDeviceId(), dst.getPort());
+                        if (!aclcheck(ethPkt, outpoint, "output", discoverentry, false)) {
+                            return;
+                        }
+                        byte[] data = ethPkt.serialize();
+                        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                            .setOutput(dst.getPort())
+                            .build();
+                        OutboundPacket outPkt = new DefaultOutboundPacket(
+                                dst.getDeviceId(),
+                                treatment,
+                                ByteBuffer.wrap(data)
+                        );
+                        packetService.emit(outPkt);
                     }
-                    byte[] data = ethPkt.serialize();
-                    TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                        .setOutput(dst.getPort())
-                        .build();
-                    OutboundPacket outPkt = new DefaultOutboundPacket(
-                            dst.getDeviceId(),
-                            treatment,
-                            ByteBuffer.wrap(data)
-                    );
-                    packetService.emit(outPkt);
                 }
+            } finally {
+                context.block();
             }
         }
     }
