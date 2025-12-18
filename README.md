@@ -12,3 +12,13 @@ modprobe openvswitch
 
 3. `docker compose up -d`
 
+## How to add onos app
+
+Push your app to `sandbox/onos/apps`
+
+## How to set frr config
+
+For main net frr, configs are at `sandbox/routeserver/frr`
+
+For transit net frr, configs are at `sandbox/transitrouter/frr`
+
