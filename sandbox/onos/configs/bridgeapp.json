@@ -1,0 +1,114 @@
+{
+  "apps": {
+    "nycu.winlab.bridgeapp": { 
+      "BridgeAppACLConfig": {
+        "input": [
+          {
+            "device": "ovs2",
+            "port": 1,
+            "dst": "${IX_PREFIX_V4}.${ID}",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "dst": "${IX_PREFIX_V6}::${ID}",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "src": "192.168.100.1",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "dst": "${IX_PREFIX_V4}.${ID}",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "dst": "${IX_PREFIX_V6}::${ID}",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 2,
+            "src": "192.168.100.1",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 2,
+            "rule": "deny"
+          }
+        ],
+        "output": [
+          {
+            "device": "ovs2",
+            "port": 1,
+            "src": "${IX_PREFIX_V4}.${ID}",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "src": "${IX_PREFIX_V6}::${ID}",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "dst": "192.168.100.1",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "src": "${IX_PREFIX_V4}.${ID}",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "src": "${IX_PREFIX_V6}::${ID}",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 2,
+            "dst": "192.168.100.1",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 2,
+            "rule": "deny"
+          }
+        ]
+      }
+    }
+  }
+}

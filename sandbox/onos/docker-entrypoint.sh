@@ -6,7 +6,7 @@ init_apps() {
         sleep 1
     done
 
-    for a in $(ls /apps)
+    for a in $(cat /apps/order.txt)
     do
         cd /apps/$a
         /root/onos/bin/onos-app localhost install! target/*.oar

@@ -18,7 +18,6 @@ package nycu.winlab.bridgeapp;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.onosproject.cfg.ComponentConfigAdapter;
 
 /**
  * Set of tests of the ONOS application component.
@@ -30,7 +29,7 @@ public class BridgeAppTest {
     @Before
     public void setUp() {
         component = new BridgeApp();
-        component.cfgService = new ComponentConfigAdapter();
+        component.cfgService = null;
         component.activate();
     }
 

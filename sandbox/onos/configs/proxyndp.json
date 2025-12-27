@@ -7,6 +7,14 @@
             "device": "ovs2",
             "port": 1,
             "type": "request",
+            "sender": "${DUMMY_PREFIX_V4}.1/32",
+            "target": "${DUMMY_PREFIX_V4}.0/24",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
             "sender": "${IX_PREFIX_V4}.${ID}/32",
             "rule": "deny"
           },
@@ -16,14 +24,6 @@
             "type": "request",
             "sender": "${IX_PREFIX_V4}.0/24",
             "target": "${IX_PREFIX_V4}.${ID}/32",
-            "rule": "accept"
-          },
-          {
-            "device": "ovs2",
-            "port": 1,
-            "type": "request",
-            "sender": "${DUMMY_PREFIX_V4}.1/32",
-            "target": "${DUMMY_PREFIX_V4}.0/24",
             "rule": "accept"
           },
           {
@@ -44,6 +44,104 @@
           {
             "device": "ovs2",
             "port": 1,
+            "type": "request",
+            "sender": "fe08::/64",
+            "target": "${IX_PREFIX_V6}::${ID}/128",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "${IX_PREFIX_V6}::/64",
+            "target": "fe08::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "fe08::/64",
+            "target": "fe08::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 2,
+            "type": "request",
+            "sender": "${DUMMY_PREFIX_V4}.1/32",
+            "target": "${DUMMY_PREFIX_V4}.0/24",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 2,
+            "type": "request",
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "request",
+            "sender": "${IX_PREFIX_V4}.${ID}/32",
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "request",
+            "sender": "${IX_PREFIX_V4}.0/24",
+            "target": "${IX_PREFIX_V4}.${ID}/32",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "request",
+            "sender": "${IX_PREFIX_V6}::${ID}/128",
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "request",
+            "sender": "${IX_PREFIX_V6}::/64",
+            "target": "${IX_PREFIX_V6}::${ID}/128",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "request",
+            "sender": "fe08::/64",
+            "target": "${IX_PREFIX_V6}::${ID}/128",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "request",
+            "sender": "${IX_PREFIX_V6}::/64",
+            "target": "fe08::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "request",
+            "sender": "fe08::/64",
+            "target": "fe08::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
             "type": "request",
             "rule": "deny"
           },
@@ -63,36 +161,16 @@
             "device": "ovs2",
             "port": 1,
             "type": "reply",
-            "target": "${LAN_PREFIX_V4}.${ID}.0/24",
-            "rule": "deny"
-          },
-          {
-            "device": "ovs2",
-            "port": 1,
-            "type": "reply",
-            "target": "${LAN_PREFIX_V6}:${ID}::/64",
-            "rule": "deny"
-          },
-          {
-            "device": "ovs2",
-            "port": 1,
-            "type": "reply",
-            "target": "${TRANSIT_LINK_PREFIX_V4}.0/24",
-            "rule": "deny"
-          },
-          {
-            "device": "ovs2",
-            "port": 1,
-            "type": "reply",
-            "target": "${TRANSIT_LINK_PREFIX_V6}::/64",
-            "rule": "deny"
-          },
-          {
-            "device": "ovs2",
-            "port": 1,
-            "type": "reply",
             "target": "${IX_PREFIX_V4}.${ID}/32",
             "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "sender": "${IX_PREFIX_V4}.${ID}/32",
+            "target": "${IX_PREFIX_V4}.0/24",
+            "rule": "accept"
           },
           {
             "device": "ovs2",
@@ -105,6 +183,39 @@
             "device": "ovs2",
             "port": 1,
             "type": "reply",
+            "sender": "${IX_PREFIX_V6}::${ID}/128",
+            "target": "${IX_PREFIX_V6}::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "sender": "fe08::/64",
+            "target": "${IX_PREFIX_V6}::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "sender": "${IX_PREFIX_V6}::${ID}/128",
+            "target": "fe08::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "sender": "fe08::/64",
+            "target": "fe08::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "sender": "${DUMMY_PREFIX_V4}.0/24",
             "target": "${DUMMY_PREFIX_V4}.1/32",
             "rule": "accept"
           },
@@ -112,14 +223,81 @@
             "device": "ovs2",
             "port": 1,
             "type": "reply",
-            "target": "${DUMMY_PREFIX_V4}.0/24",
             "rule": "deny"
           },
           {
-            "device": "ovs2",
-            "port": 1,
+            "device": "of:0000164ce5257843",
+            "port": 3,
             "type": "reply",
+            "target": "${IX_PREFIX_V4}.${ID}/32",
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "sender": "${IX_PREFIX_V4}.${ID}/32",
+            "target": "${IX_PREFIX_V4}.0/24",
             "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "target": "${IX_PREFIX_V6}::${ID}/128",
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "sender": "${IX_PREFIX_V6}::${ID}/128",
+            "target": "${IX_PREFIX_V6}::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "sender": "${IX_PREFIX_V6}::${ID}/128",
+            "target": "fe08::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "sender": "fe08::/64",
+            "target": "${IX_PREFIX_V6}::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "sender": "fe08::/64",
+            "target": "fe08::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 2,
+            "type": "reply",
+            "sender": "${DUMMY_PREFIX_V4}.0/24",
+            "target": "${DUMMY_PREFIX_V4}.1/32",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 2,
+            "type": "reply",
+            "rule": "deny"
           }
         ],
         "output": [
@@ -127,44 +305,9 @@
             "device": "ovs2",
             "port": 1,
             "type": "request",
-            "target": "${LAN_PREFIX_V4}.${ID}.0/24",
-            "rule": "deny"
-          },
-          {
-            "device": "ovs2",
-            "port": 1,
-            "type": "request",
-            "target": "${TRANSIT_LINK_PREFIX_V4}.0/24",
-            "rule": "deny"
-          },
-          {
-            "device": "ovs2",
-            "port": 1,
-            "type": "request",
-            "target": "${LAN_PREFIX_V6}:${ID}::/64",
-            "rule": "deny"
-          },
-          {
-            "device": "ovs2",
-            "port": 1,
-            "type": "request",
-            "target": "${TRANSIT_LINK_PREFIX_V6}::/64",
-            "rule": "deny"
-          },
-          {
-            "device": "ovs2",
-            "port": 1,
-            "type": "request",
             "sender": "${IX_PREFIX_V4}.${ID}/32",
             "target": "${IX_PREFIX_V4}.0/24",
             "rule": "accept"
-          },
-          {
-            "device": "ovs2",
-            "port": 1,
-            "type": "request",
-            "sender": "${IX_PREFIX_V4}.0/24",
-            "rule": "deny"
           },
           {
             "device": "ovs2",
@@ -178,8 +321,25 @@
             "device": "ovs2",
             "port": 1,
             "type": "request",
-            "sender": "${IX_PREFIX_V6}::/64",
-            "rule": "deny"
+            "sender": "${IX_PREFIX_V6}::${ID}/128",
+            "target": "fe80::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "fe80::/64",
+            "target": "${IX_PREFIX_V6}::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "request",
+            "sender": "fe80::/64",
+            "target": "fe80::/64",
+            "rule": "accept"
           },
           {
             "device": "ovs2",
@@ -193,14 +353,67 @@
             "device": "ovs2",
             "port": 1,
             "type": "request",
-            "sender": "${DUMMY_PREFIX_V4}.0/24",
             "rule": "deny"
           },
           {
-            "device": "ovs2",
-            "port": 1,
+            "device": "of:0000164ce5257843",
+            "port": 3,
             "type": "request",
+            "sender": "${IX_PREFIX_V4}.${ID}/32",
+            "target": "${IX_PREFIX_V4}.0/24",
             "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "request",
+            "sender": "${IX_PREFIX_V6}::${ID}/128",
+            "target": "${IX_PREFIX_V6}::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "request",
+            "sender": "${IX_PREFIX_V6}::${ID}/128",
+            "target": "fe80::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "request",
+            "sender": "fe80::/64",
+            "target": "${IX_PREFIX_V6}::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "request",
+            "sender": "fe80::/64",
+            "target": "fe80::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "request",
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 2,
+            "type": "request",
+            "sender": "${DUMMY_PREFIX_V4}.0/24",
+            "target": "${DUMMY_PREFIX_V4}.1/32",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 2,
+            "type": "request",
+            "rule": "deny"
           },
           {
             "device": "ovs2",
@@ -222,6 +435,30 @@
             "device": "ovs2",
             "port": 1,
             "type": "reply",
+            "sender": "${IX_PREFIX_V6}::/64",
+            "target": "fe80::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "sender": "fe80::/64",
+            "target": "${IX_PREFIX_V6}::${ID}/128",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
+            "sender": "fe80::/64",
+            "target": "fe80::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "type": "reply",
             "sender": "${DUMMY_PREFIX_V4}.1/32",
             "target": "${DUMMY_PREFIX_V4}.0/24",
             "rule": "accept"
@@ -229,6 +466,66 @@
           {
             "device": "ovs2",
             "port": 1,
+            "type": "reply",
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "sender": "${IX_PREFIX_V4}.0/24",
+            "target": "${IX_PREFIX_V4}.${ID}/32",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "sender": "${IX_PREFIX_V6}::/64",
+            "target": "${IX_PREFIX_V6}::${ID}/128",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "sender": "${IX_PREFIX_V6}::/64",
+            "target": "fe80::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "sender": "fe80::/64",
+            "target": "${IX_PREFIX_V6}::${ID}/128",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "sender": "fe80::/64",
+            "target": "fe80::/64",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "type": "reply",
+            "rule": "deny"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 2,
+            "type": "reply",
+            "sender": "${DUMMY_PREFIX_V4}.1/32",
+            "target": "${DUMMY_PREFIX_V4}.0/24",
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 2,
             "type": "reply",
             "rule": "deny"
           }

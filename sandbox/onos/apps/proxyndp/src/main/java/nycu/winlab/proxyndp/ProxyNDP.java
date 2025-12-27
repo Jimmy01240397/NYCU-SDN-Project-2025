@@ -11,6 +11,10 @@ import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Modified;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.onosproject.net.flowobjective.FlowObjectiveService;
+import org.onosproject.net.flowobjective.ForwardingObjective;
+import org.onosproject.net.flowobjective.DefaultForwardingObjective;
+import org.onosproject.net.flow.FlowRuleService;
 import org.onosproject.net.config.ConfigFactory;
 import org.onosproject.net.config.NetworkConfigEvent;
 import org.onosproject.net.config.NetworkConfigListener;
@@ -27,6 +31,8 @@ import org.onosproject.net.packet.PacketContext;
 import org.onosproject.net.packet.InboundPacket;
 import org.onosproject.net.packet.OutboundPacket;
 import org.onosproject.net.packet.DefaultOutboundPacket;
+import org.onosproject.net.device.DeviceListener;
+import org.onosproject.net.device.DeviceEvent;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
@@ -41,6 +47,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.onlab.util.Tools;
 import org.onlab.packet.Ethernet;
+import org.onlab.packet.VlanId;
 import org.onlab.packet.ARP;
 import org.onlab.packet.IPv6;
 import org.onlab.packet.ICMP6;
@@ -51,6 +58,7 @@ import org.onlab.packet.Ip6Address;
 import org.onlab.packet.ndp.NeighborSolicitation;
 import org.onlab.packet.ndp.NeighborAdvertisement;
 import org.onlab.packet.ndp.NeighborDiscoveryOptions;
+import org.onosproject.event.AbstractListenerManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +86,7 @@ import java.nio.ByteBuffer;
            property = {
            })
 @SuppressWarnings("checkstyle:AbbreviationAsWordInName")
-public class ProxyNDP {
+public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -107,9 +115,17 @@ public class ProxyNDP {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected LinkService linkService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    protected FlowObjectiveService flowObjectiveService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    protected FlowRuleService flowRuleService;
+
     private ApplicationId appId;
 
     private DiscoverPacketProcessor processor;
+
+    private final DeviceListener devicelistener = new ProxyNDPDeviceListener();
 
     private Map<DiscoverEntry, HostEntry> maccache = new HashMap<>();
     private Map<IpAddress, CacheData> discovercache = new HashMap<>();
@@ -130,6 +146,7 @@ public class ProxyNDP {
         appId = coreService.registerApplication("nycu.winlab.proxyndp");
         cfgService.addListener(cfgListener);
         cfgService.registerConfigFactory(factory);
+        deviceService.addListener(devicelistener);
         processor = new DiscoverPacketProcessor();
         packetService.addProcessor(processor, PacketProcessor.director(1));
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
@@ -138,12 +155,17 @@ public class ProxyNDP {
         selector = DefaultTrafficSelector.builder();
         selector.matchEthType(Ethernet.TYPE_IPV6).matchIPProtocol(IPv6.PROTOCOL_ICMP6);
         packetService.requestPackets(selector.build(), PacketPriority.REACTIVE, appId);
+        eventDispatcher.addSink(MacEvent.class, listenerRegistry);
 
         executor = Executors.newSingleThreadScheduledExecutor(Tools.groupedThreads(
                     "nycu.winlab.proxyndp",
                     "timeouthandler",
                     log));
         executor.scheduleAtFixedRate(this::timeouthandler, 0, 1, TimeUnit.SECONDS);
+
+        for (Device device : deviceService.getDevices()) {
+            initflow(device.id());
+        }
     }
 
     @Deactivate
@@ -156,6 +178,9 @@ public class ProxyNDP {
         }
         cfgService.removeListener(cfgListener);
         cfgService.unregisterConfigFactory(factory);
+        deviceService.removeListener(devicelistener);
+        flowRuleService.removeFlowRulesById(appId);
+        eventDispatcher.removeSink(MacEvent.class);
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchEthType(Ethernet.TYPE_ARP);
         packetService.cancelPackets(selector.build(), PacketPriority.REACTIVE, appId);
@@ -212,6 +237,18 @@ public class ProxyNDP {
                 return true;
         }
         for (AclRule rule : rules) {
+            //log.info("Test acl {} {} {} {} {} {} {} {} {} {}", table, rule.rule, point,
+            //        discoverentry.getSenderIp(),
+            //        discoverentry.getTargetIp(),
+            //        rule.device,
+            //        rule.port,
+            //        rule.sender,
+            //        rule.target,
+            //        rule.match(point,
+            //                   discoverentry.getSenderIp(),
+            //                   discoverentry.getTargetIp(),
+            //                   request)
+            //        );
             if (rule.match(point,
                            discoverentry.getSenderIp(),
                            discoverentry.getTargetIp(),
@@ -307,6 +344,9 @@ public class ProxyNDP {
                     if (!aclcheck(ethPkt, frompoint, "input", discoverentry, true)) {
                         return;
                     }
+                    log.info("Cache request {} {} -> {} {} from {}", discoverentry.getSenderIp(),
+                            discoverentry.getSenderMac(), discoverentry.getTargetIp(),
+                            discoverentry.getTargetMac(), frompoint);
                     newdiscovercache(discoverentry.getSenderIp(), new CacheData(discoverentry.getSenderMac(),
                                 discoverentry.getOption()));
                     CacheData targetcache = getdiscovercache(discoverentry.getTargetIp());
@@ -320,6 +360,7 @@ public class ProxyNDP {
                             nonEdge.add(link.dst());
                         }
                         for (Device device : deviceService.getDevices()) {
+                            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
                             for (Port port : deviceService.getPorts(device.id())) {
                                 ConnectPoint outpoint = new ConnectPoint(device.id(), port.number());
                                 if (port.number().equals(PortNumber.LOCAL) ||
@@ -330,16 +371,14 @@ public class ProxyNDP {
                                 if (!aclcheck(ethPkt, outpoint, "output", discoverentry, true)) {
                                     continue;
                                 }
-                                TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                                    .setOutput(port.number())
-                                    .build();
-                                OutboundPacket outPkt = new DefaultOutboundPacket(
-                                        device.id(),
-                                        treatment,
-                                        ByteBuffer.wrap(data)
-                                );
-                                packetService.emit(outPkt);
+                                treatment.setOutput(port.number());
                             }
+                            OutboundPacket outPkt = new DefaultOutboundPacket(
+                                    device.id(),
+                                    treatment.build(),
+                                    ByteBuffer.wrap(data)
+                            );
+                            packetService.emit(outPkt);
                         }
                         if (cacheresult) {
                             log.info("{} TABLE MISS. Send {} to edge ports", pkttype, requestmsg);
@@ -369,6 +408,9 @@ public class ProxyNDP {
                     if (!aclcheck(ethPkt, frompoint, "input", discoverentry, false)) {
                         return;
                     }
+                    log.info("Cache reply {} {} -> {} {} from {}", discoverentry.getSenderIp(),
+                            discoverentry.getSenderMac(), discoverentry.getTargetIp(),
+                            discoverentry.getTargetMac(), frompoint);
                     newdiscovercache(discoverentry.getTargetIp(), new CacheData(discoverentry.getTargetMac(),
                                 discoverentry.getOption()));
                     log.info("{} RECV REPLY. Requested MAC = {}", pkttype, discoverentry.getTargetMac());
@@ -396,6 +438,114 @@ public class ProxyNDP {
         }
     }
 
+    public void sendrequest(IpAddress sender, MacAddress sendermac, IpAddress target) {
+        DiscoverEntry discoverentry = null;
+        if (target.isIp4()) {
+            discoverentry = new ArpEntry(sender, sendermac, target, MacAddress.ZERO);
+        } else if (target.isIp6()) {
+            discoverentry = new NdpEntry(sender, sendermac, target, MacAddress.ZERO);
+        }
+
+        Ethernet ethPkt = discoverentry.buildRequest();
+        byte[] data = ethPkt.serialize();
+
+        Set<ConnectPoint> nonEdge = new HashSet<>();
+        for (Link link : linkService.getLinks()) {
+            nonEdge.add(link.src());
+            nonEdge.add(link.dst());
+        }
+        for (Device device : deviceService.getDevices()) {
+            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+            for (Port port : deviceService.getPorts(device.id())) {
+                ConnectPoint outpoint = new ConnectPoint(device.id(), port.number());
+                if (port.number().equals(PortNumber.LOCAL) ||
+                    nonEdge.contains(outpoint)) {
+                    continue;
+                }
+                if (!aclcheck(ethPkt, outpoint, "output", discoverentry, true)) {
+                    continue;
+                }
+                treatment.setOutput(port.number());
+            }
+            OutboundPacket outPkt = new DefaultOutboundPacket(
+                    device.id(),
+                    treatment.build(),
+                    ByteBuffer.wrap(data)
+            );
+            packetService.emit(outPkt);
+        }
+    }
+
+    private void initflow(DeviceId deviceId) {
+        TrafficSelector selector = DefaultTrafficSelector.builder()
+            .matchEthType(Ethernet.TYPE_ARP)
+            .build();
+        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+            .setOutput(PortNumber.CONTROLLER)
+            .build();
+        ForwardingObjective forwardingObjective = DefaultForwardingObjective.builder().
+            withSelector(selector).
+            withTreatment(treatment).
+            withPriority(30000).
+            withFlag(ForwardingObjective.Flag.VERSATILE).
+            fromApp(appId).
+            makePermanent().
+            add();
+        flowObjectiveService.forward(deviceId, forwardingObjective);
+
+        selector = DefaultTrafficSelector.builder()
+            .matchEthType(Ethernet.TYPE_IPV6)
+            .matchIPProtocol(IPv6.PROTOCOL_ICMP6)
+            .matchIcmpv6Type((byte) 135)
+            .build();
+        treatment = DefaultTrafficTreatment.builder()
+            .setOutput(PortNumber.CONTROLLER)
+            .build();
+        forwardingObjective = DefaultForwardingObjective.builder().
+            withSelector(selector).
+            withTreatment(treatment).
+            withPriority(30000).
+            withFlag(ForwardingObjective.Flag.VERSATILE).
+            fromApp(appId).
+            makePermanent().
+            add();
+        flowObjectiveService.forward(deviceId, forwardingObjective);
+
+        selector = DefaultTrafficSelector.builder()
+            .matchEthType(Ethernet.TYPE_IPV6)
+            .matchIPProtocol(IPv6.PROTOCOL_ICMP6)
+            .matchIcmpv6Type((byte) 136)
+            .build();
+        treatment = DefaultTrafficTreatment.builder()
+            .setOutput(PortNumber.CONTROLLER)
+            .build();
+        forwardingObjective = DefaultForwardingObjective.builder().
+            withSelector(selector).
+            withTreatment(treatment).
+            withPriority(30000).
+            withFlag(ForwardingObjective.Flag.VERSATILE).
+            fromApp(appId).
+            makePermanent().
+            add();
+        flowObjectiveService.forward(deviceId, forwardingObjective);
+
+        selector = DefaultTrafficSelector.builder()
+            .matchEthType((short) 0x8942)
+            .build();
+        treatment = DefaultTrafficTreatment.builder()
+            .setOutput(PortNumber.CONTROLLER)
+            .build();
+        forwardingObjective = DefaultForwardingObjective.builder().
+            withSelector(selector).
+            withTreatment(treatment).
+            withPriority(30000).
+            withFlag(ForwardingObjective.Flag.VERSATILE).
+            fromApp(appId).
+            makePermanent().
+            add();
+        flowObjectiveService.forward(deviceId, forwardingObjective);
+    }
+
     @SuppressWarnings("checkstyle:AbbreviationAsWordInName")
     private class ProxyNDPACLConfigListener implements NetworkConfigListener {
         @Override
@@ -407,6 +557,21 @@ public class ProxyNDP {
                     inputRules = config.getInputRules();
                     outputRules = config.getOutputRules();
                 }
+            }
+        }
+    }
+
+    @SuppressWarnings("checkstyle:AbbreviationAsWordInName")
+    private class ProxyNDPDeviceListener implements DeviceListener {
+        @Override
+        public void event(DeviceEvent event) {
+            Device device = event.subject();
+            switch (event.type()) {
+                case DEVICE_ADDED:
+                    initflow(device.id());
+                    break;
+                default:
+                    break;
             }
         }
     }
@@ -466,15 +631,21 @@ public class ProxyNDP {
     }
 
     private void newdiscovercache(IpAddress ip, CacheData cache) {
+        boolean change = false;
         discoverlock.writeLock().lock();
         try {
+            CacheData result = discovercache.get(ip);
+            change = (result == null || !result.getMac().equals(cache.getMac()));
             discovercache.put(ip, cache);
         } finally {
             discoverlock.writeLock().unlock();
         }
+        if (change) {
+            post(new MacEvent(MacEventType.UPDATE, new IpMac(ip, cache.getMac())));
+        }
     }
 
-    private CacheData getdiscovercache(IpAddress targetIp) {
+    public CacheData getdiscovercache(IpAddress targetIp) {
         CacheData result = null;
         discoverlock.writeLock().lock();
         try {
@@ -510,7 +681,7 @@ public class ProxyNDP {
         }
     }
 
-    private class CacheData extends Cache {
+    public class CacheData extends Cache {
         private MacAddress mac;
         private Object option;
         public CacheData(MacAddress mac, Object option) {
@@ -607,6 +778,10 @@ public class ProxyNDP {
         public Ethernet buildReply(Ethernet request) {
             return null;
         }
+
+        public Ethernet buildRequest() {
+            return null;
+        }
     }
 
     private class ArpEntry extends DiscoverEntry {
@@ -625,14 +800,38 @@ public class ProxyNDP {
             }
         }
 
+        public ArpEntry(IpAddress senderIp, MacAddress senderMac, IpAddress targetIp, MacAddress targetMac) {
+            this.senderIp = senderIp;
+            this.senderMac = senderMac;
+            this.targetIp = targetIp;
+            this.targetMac = targetMac;
+        }
+
         @Override
         public Ethernet buildReply(Ethernet request) {
             return ARP.buildArpReply((Ip4Address) targetIp, targetMac, request);
+        }
+
+        @Override
+        public Ethernet buildRequest() {
+            return ARP.buildArpRequest(senderMac.toBytes(),
+                    senderIp.toOctets(),
+                    targetIp.toOctets(),
+                    VlanId.NONE.toShort());
         }
     }
 
     private class NdpEntry extends DiscoverEntry {
         private boolean isdad = false;
+
+        public NdpEntry(IpAddress senderIp, MacAddress senderMac, IpAddress targetIp, MacAddress targetMac) {
+            this.senderIp = senderIp;
+            this.senderMac = senderMac;
+            this.targetIp = targetIp;
+            this.targetMac = targetMac;
+            option = false;
+        }
+
         public NdpEntry(MacAddress senderMac, Ip6Address senderIp, ICMP6 ndp) {
             byte type = ndp.getIcmpType();
             byte code = ndp.getIcmpCode();
@@ -678,6 +877,25 @@ public class ProxyNDP {
             na.setSolicitedFlag((byte) (!isdad ? 1 : 0));
             na.setOverrideFlag((byte) 1);
             return reply;
+        }
+
+        @Override
+        public Ethernet buildRequest() {
+            byte[] targetIpByte = targetIp.toOctets();
+            byte[] dstipbyte = Ip6Address.valueOf("ff02::1:ff00:0000").toOctets();
+            dstipbyte[13] = targetIpByte[13];
+            dstipbyte[14] = targetIpByte[14];
+            dstipbyte[15] = targetIpByte[15];
+            byte[] dstmacbyte = MacAddress.valueOf("33:33:ff:00:00:00").toBytes();
+            dstmacbyte[3] = targetIpByte[13];
+            dstmacbyte[4] = targetIpByte[14];
+            dstmacbyte[5] = targetIpByte[15];
+            return NeighborSolicitation.buildNdpSolicit((Ip6Address) targetIp,
+                    (Ip6Address) senderIp,
+                    Ip6Address.valueOf(dstipbyte),
+                    senderMac,
+                    MacAddress.valueOf(dstmacbyte),
+                    VlanId.NONE);
         }
 
         @Override
