@@ -24,6 +24,8 @@ import org.onosproject.net.config.NetworkConfigRegistry;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceEvent;
+import org.onosproject.net.packet.OutboundPacket;
+import org.onosproject.net.packet.DefaultOutboundPacket;
 import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.packet.PacketService;
 import org.onosproject.net.packet.PacketProcessor;
@@ -38,25 +40,35 @@ import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flowobjective.FlowObjectiveService;
 import org.onosproject.net.flowobjective.ForwardingObjective;
 import org.onosproject.net.flowobjective.DefaultForwardingObjective;
+import org.onosproject.net.link.LinkService;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.Port;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Device;
+import org.onosproject.net.Link;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.MacAddress;
+import org.onlab.packet.IPv4;
+import org.onlab.packet.IPv6;
+import org.onlab.packet.IpAddress;
+import org.onlab.packet.Ip4Address;
+import org.onlab.packet.Ip6Address;
+import org.onlab.packet.IpPrefix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Objects;
 import java.util.Dictionary;
 import java.util.Properties;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.nio.ByteBuffer;
 
 //import static org.onlab.util.Tools.get;
 
@@ -65,17 +77,28 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
            property = {
            })
 public class BridgeApp {
+    private static final int BRIDGERULEPRIORITY = 3000;
+    private static final int ACLRULEPRIORITY = 1000;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final BridgeAppACLConfigListener cfgListener = new BridgeAppACLConfigListener();
+    private final BridgeAppConfigListener cfgListener = new BridgeAppConfigListener();
 
-    private final ConfigFactory<ApplicationId, BridgeAppACLConfig> factory =
+    private final ConfigFactory<ApplicationId, BridgeAppACLConfig> aclfactory =
         new ConfigFactory<ApplicationId, BridgeAppACLConfig>(
             APP_SUBJECT_FACTORY, BridgeAppACLConfig.class, "BridgeAppACLConfig") {
         @Override
         public BridgeAppACLConfig createConfig() {
             return new BridgeAppACLConfig();
+        }
+    };
+
+    private final ConfigFactory<ApplicationId, BridgeAppInitConfig> initfactory =
+        new ConfigFactory<ApplicationId, BridgeAppInitConfig>(
+            APP_SUBJECT_FACTORY, BridgeAppInitConfig.class, "BridgeAppInitConfig") {
+        @Override
+        public BridgeAppInitConfig createConfig() {
+            return new BridgeAppInitConfig();
         }
     };
 
@@ -96,6 +119,9 @@ public class BridgeApp {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected PacketService packetService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    protected LinkService linkService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected ProxyNDP proxyndp;
@@ -122,7 +148,8 @@ public class BridgeApp {
         }
         appId = coreService.registerApplication("nycu.winlab.bridgeapp");
         cfgService.addListener(cfgListener);
-        cfgService.registerConfigFactory(factory);
+        cfgService.registerConfigFactory(aclfactory);
+        cfgService.registerConfigFactory(initfactory);
         processor = new LearnPacketProcessor();
         packetService.addProcessor(processor, PacketProcessor.director(2));
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
@@ -137,7 +164,8 @@ public class BridgeApp {
             return;
         }
         cfgService.removeListener(cfgListener);
-        cfgService.unregisterConfigFactory(factory);
+        cfgService.unregisterConfigFactory(aclfactory);
+        cfgService.unregisterConfigFactory(initfactory);
         proxyndp.removeListener(maceventlistener);
         deviceService.removeListener(devicelistener);
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
@@ -148,7 +176,7 @@ public class BridgeApp {
         mactables.clear();
     }
 
-    private boolean aclcheck(Ethernet ethPkt, ConnectPoint point, String table) {
+    public AclRule aclcheck(Ethernet ethPkt, ConnectPoint point, String table) {
         List<AclRule> rules = null;
         switch (table) {
             case "input":
@@ -158,27 +186,91 @@ public class BridgeApp {
                 rules = outputRules;
                 break;
             default:
-                return true;
+                return new AclRule(null, null, null, null, false, false, "accept", "");
         }
         for (AclRule rule : rules) {
-            if (rule.match(proxyndp, point,
+            IpAddress sip = null;
+            IpAddress dip = null;
+            if (ethPkt.getEtherType() == Ethernet.TYPE_IPV4) {
+                IPv4 ipv4Pkt = (IPv4) ethPkt.getPayload();
+                sip = Ip4Address.valueOf(ipv4Pkt.getSourceAddress());
+                dip = Ip4Address.valueOf(ipv4Pkt.getDestinationAddress());
+            } else if (ethPkt.getEtherType() == Ethernet.TYPE_IPV6) {
+                IPv6 ipv6Pkt = (IPv6) ethPkt.getPayload();
+                sip = Ip6Address.valueOf(ipv6Pkt.getSourceAddress());
+                dip = Ip6Address.valueOf(ipv6Pkt.getDestinationAddress());
+            }
+            //log.info("Test acl {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+            //        table, rule.rule, point,
+            //        ethPkt.getSourceMAC(),
+            //        ethPkt.getDestinationMAC(),
+            //        sip, dip,
+            //        rule.device,
+            //        rule.port,
+            //        rule.src,
+            //        rule.dst,
+            //        rule.strict,
+            //        rule.linklocal,
+            //        rule.src == null ? null : rule.src.equals(sip),
+            //        rule.dst == null ? null : rule.dst.equals(dip),
+            //        rule.match(proxyndp, point, sip, dip,
+            //                   ethPkt.getSourceMAC(),
+            //                   ethPkt.getDestinationMAC())
+            //        );
+            if (rule.match(proxyndp, point, sip, dip,
                            ethPkt.getSourceMAC(),
                            ethPkt.getDestinationMAC())) {
                 switch (rule.rule) {
+                    case "log":
+                        log.info("ACL log table: {} point: {} source ip: {} source mac: {} dst ip: {} dst mac: {}",
+                                table, point, sip, ethPkt.getSourceMAC(),
+                                dip, ethPkt.getDestinationMAC());
+                        break;
                     case "accept":
-                        return true;
+                        return rule;
                     case "deny":
-                        return false;
+                        return rule;
                     default:
                         break;
                 }
             }
         }
-        return true;
+        return new AclRule(null, null, null, null, false, false, "accept", "");
     }
 
     private boolean acltoflow(AclRule rule, int priority) {
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        if (rule.strict) {
+            boolean ip6 = (rule.src != null && rule.src.isIp6()) ||
+                          (rule.dst != null && rule.dst.isIp6());
+            if (!ip6) {
+                selector.matchEthType(Ethernet.TYPE_IPV4);
+                if (rule.src != null) {
+                    selector.matchIPSrc(IpPrefix.valueOf(rule.src, 32));
+                }
+                if (rule.dst != null) {
+                    selector.matchIPDst(IpPrefix.valueOf(rule.dst, 32));
+                }
+            } else {
+                selector.matchEthType(Ethernet.TYPE_IPV6);
+                if (rule.linklocal) {
+                    IpPrefix linklocalprefix = IpPrefix.valueOf("fe80::/64");
+                    if (rule.src != null) {
+                        selector.matchIPv6Src(linklocalprefix);
+                    }
+                    if (rule.dst != null) {
+                        selector.matchIPv6Dst(linklocalprefix);
+                    }
+                } else {
+                    if (rule.src != null) {
+                        selector.matchIPv6Src(IpPrefix.valueOf(rule.src, 128));
+                    }
+                    if (rule.dst != null) {
+                        selector.matchIPv6Dst(IpPrefix.valueOf(rule.dst, 128));
+                    }
+                }
+            }
+        }
         if (rule.port != null) {
             selector.matchInPort(rule.port);
         }
@@ -285,7 +377,7 @@ public class BridgeApp {
             DeviceId deviceId = pkt.receivedFrom().deviceId();
             PortNumber fromport = pkt.receivedFrom().port();
             ConnectPoint frompoint = new ConnectPoint(deviceId, fromport);
-            if (!aclcheck(ethPkt, frompoint, "input")) {
+            if (aclcheck(ethPkt, frompoint, "input").rule.equalsIgnoreCase("deny")) {
                 return;
             }
             if (dstmac.isBroadcast() || dstmac.isMulticast()) {
@@ -302,22 +394,42 @@ public class BridgeApp {
     }
 
     @SuppressWarnings("checkstyle:AbbreviationAsWordInName")
-    private class BridgeAppACLConfigListener implements NetworkConfigListener {
+    private class BridgeAppConfigListener implements NetworkConfigListener {
         @Override
         public void event(NetworkConfigEvent event) {
-            if ((event.type() == CONFIG_ADDED || event.type() == CONFIG_UPDATED)
-                    && event.configClass().equals(BridgeAppACLConfig.class)) {
-                BridgeAppACLConfig config = cfgService.getConfig(appId, BridgeAppACLConfig.class);
-                if (config != null) {
-                    for (int i = 0; inputRules != null && i < inputRules.size(); i++) {
-                        AclRule rule = inputRules.get(i);
-                        removeaclflow(rule, 1000 - i);
+            if (event.type() == CONFIG_ADDED || event.type() == CONFIG_UPDATED) {
+                if (event.configClass().equals(BridgeAppACLConfig.class)) {
+                    BridgeAppACLConfig config = cfgService.getConfig(appId, BridgeAppACLConfig.class);
+                    if (config != null) {
+                        for (int i = 0; inputRules != null && i < inputRules.size(); i++) {
+                            AclRule rule = inputRules.get(i);
+                            removeaclflow(rule, ACLRULEPRIORITY - i);
+                        }
+                        inputRules = config.getInputRules();
+                        outputRules = config.getOutputRules();
+                        for (int i = 0; i < inputRules.size(); i++) {
+                            AclRule rule = inputRules.get(i);
+                            acltoflow(rule, ACLRULEPRIORITY - i);
+                        }
                     }
-                    inputRules = config.getInputRules();
-                    outputRules = config.getOutputRules();
-                    for (int i = 0; i < inputRules.size(); i++) {
-                        AclRule rule = inputRules.get(i);
-                        acltoflow(rule, 1000 - i);
+                }
+
+                if (event.configClass().equals(BridgeAppInitConfig.class)) {
+                    BridgeAppInitConfig config = cfgService.getConfig(appId, BridgeAppInitConfig.class);
+                    if (config != null) {
+                        List<HostEntry> hostentrys = config.getHostEntry();
+                        for (int i = 0; i < hostentrys.size(); i++) {
+                            HostEntry hostentry = hostentrys.get(i);
+                            if (hostentry.getDeviceId() != null) {
+                                DeviceId deviceId = hostentry.getDeviceId();
+                                newhostentry(hostentry.getMac(), deviceId, hostentry.getPort());
+                                continue;
+                            }
+                            for (Device device : deviceService.getDevices()) {
+                                DeviceId deviceId = device.id();
+                                newhostentry(hostentry.getMac(), deviceId, hostentry.getPort());
+                            }
+                        }
                     }
                 }
             }
@@ -331,8 +443,8 @@ public class BridgeApp {
                 AclRule rule = inputRules.get(i);
                 if ((rule.src != null && rule.src.equals(macevent.subject().getIp())) ||
                     (rule.dst != null && rule.dst.equals(macevent.subject().getIp()))) {
-                    removeaclflow(rule, 1000 - i);
-                    acltoflow(rule, 1000 - i);
+                    removeaclflow(rule, ACLRULEPRIORITY - i);
+                    acltoflow(rule, ACLRULEPRIORITY - i);
                 }
             }
         }
@@ -346,9 +458,9 @@ public class BridgeApp {
                 case DEVICE_ADDED:
                     for (int i = 0; inputRules != null && i < inputRules.size(); i++) {
                         AclRule rule = inputRules.get(i);
-                        if (rule.device.equals(device.id())) {
-                            removeaclflow(rule, 1000 - i);
-                            acltoflow(rule, 1000 - i);
+                        if (rule.device == null || rule.device.equals(device.id())) {
+                            removeaclflow(rule, ACLRULEPRIORITY - i);
+                            acltoflow(rule, ACLRULEPRIORITY - i);
                         }
                     }
                     break;
@@ -361,11 +473,17 @@ public class BridgeApp {
     private void flood(PacketContext context) {
         InboundPacket pkt = context.inPacket();
         Ethernet ethPkt = pkt.parsed();
+        TrafficTreatment.Builder contexttreatment = context.treatmentBuilder();
+        flood(context, contexttreatment, ethPkt);
+    }
+
+    public void flood(PacketContext context, TrafficTreatment.Builder treatment,
+            Ethernet ethPkt) {
+        InboundPacket pkt = context.inPacket();
         MacAddress dstmac = ethPkt.getDestinationMAC();
         DeviceId deviceId = pkt.receivedFrom().deviceId();
         PortNumber fromport = pkt.receivedFrom().port();
         ConnectPoint frompoint = new ConnectPoint(deviceId, fromport);
-        TrafficTreatment.Builder treatment = context.treatmentBuilder();
 
         for (Port port : deviceService.getPorts(deviceId)) {
             ConnectPoint outpoint = new ConnectPoint(deviceId, port.number());
@@ -373,13 +491,21 @@ public class BridgeApp {
                 outpoint.equals(frompoint)) {
                 continue;
             }
-            if (!aclcheck(ethPkt, outpoint, "output")) {
+            if (aclcheck(ethPkt, outpoint, "output").rule.equalsIgnoreCase("deny")) {
                 continue;
             }
             treatment.setOutput(port.number());
         }
+        byte[] data = ethPkt.serialize();
+        OutboundPacket outPkt = new DefaultOutboundPacket(
+                deviceId,
+                treatment.build(),
+                ByteBuffer.wrap(data)
+        );
+        packetService.emit(outPkt);
+        context.block();
 
-        context.send();
+        //context.send();
         log.info("MAC address `{}` is missed on `{}`. Flood the packet.", dstmac, deviceId);
     }
 
@@ -390,39 +516,56 @@ public class BridgeApp {
         PortNumber fromport = pkt.receivedFrom().port();
         DeviceId fromdevice = pkt.receivedFrom().deviceId();
 
-        TrafficSelector selector = DefaultTrafficSelector.builder().
-            matchInPort(dst.getPort()).
-            matchEthSrc(dst.getMac()).
-            matchEthDst(srcmac).
-            build();
+        AclRule rule = aclcheck(ethPkt, new ConnectPoint(dst.getDeviceId(), dst.getPort()),
+                "output");
+
+        if (rule.rule.equalsIgnoreCase("deny")) {
+            return;
+        }
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+
+        if (rule.strict) {
+            if (ethPkt.getEtherType() == Ethernet.TYPE_IPV4) {
+                selector.matchEthType(Ethernet.TYPE_IPV4);
+                if (rule.src != null) {
+                    selector.matchIPSrc(IpPrefix.valueOf(rule.src, 32));
+                }
+                if (rule.dst != null) {
+                    selector.matchIPDst(IpPrefix.valueOf(rule.dst, 32));
+                }
+            } else if (ethPkt.getEtherType() == Ethernet.TYPE_IPV6) {
+                selector.matchEthType(Ethernet.TYPE_IPV6);
+                if (rule.linklocal) {
+                    IpPrefix linklocalprefix = IpPrefix.valueOf("fe80::/64");
+                    if (rule.src != null) {
+                        selector.matchIPv6Src(linklocalprefix);
+                    }
+                    if (rule.dst != null) {
+                        selector.matchIPv6Dst(linklocalprefix);
+                    }
+                } else {
+                    if (rule.src != null) {
+                        selector.matchIPv6Src(IpPrefix.valueOf(rule.src, 128));
+                    }
+                    if (rule.dst != null) {
+                        selector.matchIPv6Dst(IpPrefix.valueOf(rule.dst, 128));
+                    }
+                }
+            } else {
+                return;
+            }
+        }
+
+        selector.matchEthSrc(srcmac);
+        selector.matchEthDst(dst.getMac());
         TrafficTreatment treatment = DefaultTrafficTreatment.builder().
-            setOutput(fromport).
-            build();
-        ForwardingObjective forwardingObjective = DefaultForwardingObjective.builder().
-            withSelector(selector).
-            withTreatment(treatment).
-            withPriority(2000).
-            withFlag(ForwardingObjective.Flag.VERSATILE).
-            fromApp(appId).
-            makeTemporary(300).
-            add();
-        flowObjectiveService.forward(fromdevice, forwardingObjective);
-
-        log.info("MAC address `{}` is matched on `{}/{}`. Install a flow rule.",
-                srcmac, fromdevice, fromport);
-
-        selector = DefaultTrafficSelector.builder().
-            matchInPort(fromport).
-            matchEthSrc(srcmac).
-            matchEthDst(dst.getMac()).
-            build();
-        treatment = DefaultTrafficTreatment.builder().
             setOutput(dst.getPort()).
             build();
-        forwardingObjective = DefaultForwardingObjective.builder().
-            withSelector(selector).
+        ForwardingObjective forwardingObjective = DefaultForwardingObjective.builder().
+            withSelector(selector.build()).
             withTreatment(treatment).
-            withPriority(2000).
+            withPriority(BRIDGERULEPRIORITY).
             withFlag(ForwardingObjective.Flag.VERSATILE).
             fromApp(appId).
             makeTemporary(300).
@@ -435,12 +578,33 @@ public class BridgeApp {
                 dst.getMac(), dst.getDeviceId(), dst.getPort());
     }
 
-    private void newhostentry(PacketContext context) {
+    public void newhostentry(PacketContext context) {
         InboundPacket pkt = context.inPacket();
         Ethernet ethPkt = pkt.parsed();
         MacAddress srcmac = ethPkt.getSourceMAC();
         PortNumber fromport = pkt.receivedFrom().port();
         DeviceId deviceId = pkt.receivedFrom().deviceId();
+        boolean run = (ethPkt.getEtherType() != Ethernet.TYPE_IPV4 &&
+                       ethPkt.getEtherType() != Ethernet.TYPE_IPV6);
+        if (!run) {
+            if (ethPkt.getEtherType() == Ethernet.TYPE_IPV4) {
+                IPv4 ipv4Pkt = (IPv4) ethPkt.getPayload();
+                ProxyNDP.CacheData arpresult =
+                    proxyndp.getdiscovercache(Ip4Address.valueOf(ipv4Pkt.getSourceAddress()));
+                run = arpresult != null && arpresult.getMac().equals(srcmac);
+            } else if (ethPkt.getEtherType() == Ethernet.TYPE_IPV6) {
+                IPv6 ipv6Pkt = (IPv6) ethPkt.getPayload();
+                ProxyNDP.CacheData ndpresult =
+                    proxyndp.getdiscovercache(Ip6Address.valueOf(ipv6Pkt.getSourceAddress()));
+                run = ndpresult != null && ndpresult.getMac().equals(srcmac);
+            }
+        }
+        if (run) {
+            newhostentry(srcmac, deviceId, fromport);
+        }
+    }
+
+    public void newhostentry(MacAddress mac, DeviceId deviceId, PortNumber port) {
         lock.writeLock().lock();
         try {
             Map<MacAddress, HostEntry> mactable = mactables.get(deviceId);
@@ -448,18 +612,18 @@ public class BridgeApp {
                 mactable = new HashMap<>();
                 mactables.put(deviceId, mactable);
             }
-            HostEntry entry = new HostEntry(deviceId, fromport, srcmac);
-            if (!entry.equals(mactable.get(srcmac))) {
-                mactable.put(srcmac, entry);
+            HostEntry entry = new HostEntry(deviceId, port, mac);
+            if (!entry.equals(mactable.get(mac))) {
+                mactable.put(mac, entry);
                 log.info("Add an entry to the port table of `{}`. MAC address: `{}` => Port: `{}`.",
-                        deviceId, srcmac, fromport);
+                        deviceId, mac, port);
             }
         } finally {
             lock.writeLock().unlock();
         }
     }
 
-    private HostEntry gethostentry(DeviceId deviceId, MacAddress mac) {
+    public HostEntry gethostentry(DeviceId deviceId, MacAddress mac) {
         lock.readLock().lock();
         try {
             Map<MacAddress, HostEntry> mactable = mactables.get(deviceId);
@@ -473,40 +637,51 @@ public class BridgeApp {
         }
     }
 
-    private class HostEntry {
-        private MacAddress mac;
-        private DeviceId deviceId;
-        private PortNumber port;
-        public HostEntry(DeviceId deviceId, PortNumber port, MacAddress mac) {
-            this.mac = mac;
-            this.port = port;
-            this.deviceId = deviceId;
-        }
-        public MacAddress getMac() {
-            return mac;
-        }
-        public DeviceId getDeviceId() {
-            return deviceId;
-        }
-        public PortNumber getPort() {
-            return port;
-        }
-        @Override
-        public int hashCode() {
-            return Objects.hash(mac, deviceId, port);
-        }
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
+    public HostEntry buildhostentry(DeviceId targetdeviceId, MacAddress mac) {
+        HostEntry start = null;
+        for (Device device : deviceService.getDevices()) {
+            start = gethostentry(device.id(), mac);
+            if (start != null) {
+                break;
             }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-            HostEntry entry = (HostEntry) o;
-            return mac.equals(entry.mac) &&
-                deviceId.equals(entry.deviceId) &&
-                port.equals(entry.port);
         }
+        if (start == null) {
+            return null;
+        }
+
+        Set<DeviceId> existdevices = new HashSet<>();
+        List<DeviceId> tmpdevices = new ArrayList<>();
+        tmpdevices.add(start.getDeviceId());
+        existdevices.add(start.getDeviceId());
+        while (gethostentry(targetdeviceId, mac) == null &&
+                tmpdevices.size() > 0) {
+            List<DeviceId> tmp = tmpdevices;
+            tmpdevices = new ArrayList<>();
+            for (DeviceId tmpdevice : tmp) {
+                for (Link link : linkService.getDeviceLinks(tmpdevice)) {
+                    DeviceId neighbor;
+                    PortNumber ingressPort;
+                    if (link.src().deviceId().equals(tmpdevice)) {
+                        neighbor = link.dst().deviceId();
+                        ingressPort = link.dst().port();
+                    } else {
+                        neighbor = link.src().deviceId();
+                        ingressPort = link.src().port();
+                    }
+
+                    if (existdevices.contains(neighbor)) {
+                        continue;
+                    }
+
+                    if (gethostentry(neighbor, mac) == null) {
+                        newhostentry(mac, neighbor, ingressPort);
+                    }
+
+                    existdevices.add(neighbor);
+                    tmpdevices.add(neighbor);
+                }
+            }
+        }
+        return gethostentry(targetdeviceId, mac);
     }
 }

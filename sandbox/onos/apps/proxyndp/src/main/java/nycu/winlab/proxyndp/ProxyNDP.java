@@ -193,7 +193,7 @@ public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener
     private void timeouthandler() {
         try {
             cleancache(maccache, maclock);
-            cleancache(discovercache, discoverlock);
+            //cleancache(discovercache, discoverlock);
         } catch (Exception e) {
             log.warn("Timeout handler failed", e);
         }
@@ -254,6 +254,12 @@ public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener
                            discoverentry.getTargetIp(),
                            request)) {
                 switch (rule.rule) {
+                    case "log":
+                        log.info("ACL log {} table: {} point: {} senderip: {} sendermac: {} targetip: {} targetmac: {}",
+                                request ? "request" : "reply", table, point,
+                                discoverentry.getSenderIp(), discoverentry.getSenderMac(),
+                                discoverentry.getTargetIp(), discoverentry.getTargetMac());
+                        break;
                     case "accept":
                         return true;
                     case "deny":
@@ -262,6 +268,9 @@ public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener
                         if (table.equalsIgnoreCase("input") && request) {
                             discoverentry.setTargetMac(MacAddress.valueOf(rule.data));
                             discoverentry.setOption(discoverentry.defaultOption());
+                            newdiscovercache(discoverentry.getTargetIp(),
+                                new CacheData(discoverentry.getTargetMac(),
+                                discoverentry.getOption()));
                             Ethernet ethReply = discoverentry.buildReply(ethPkt);
                             if (!aclcheck(ethReply, point, "output", discoverentry, false)) {
                                 return false;
@@ -633,15 +642,18 @@ public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener
     private void newdiscovercache(IpAddress ip, CacheData cache) {
         boolean change = false;
         discoverlock.writeLock().lock();
+        CacheData result = null;
         try {
-            CacheData result = discovercache.get(ip);
+            result = discovercache.get(ip);
             change = (result == null || !result.getMac().equals(cache.getMac()));
             discovercache.put(ip, cache);
         } finally {
             discoverlock.writeLock().unlock();
         }
         if (change) {
-            post(new MacEvent(MacEventType.UPDATE, new IpMac(ip, cache.getMac())));
+            post(new MacEvent(MacEventType.UPDATE, new IpMac(ip,
+                            cache.getMac(),
+                            result == null ? null : result.getMac())));
         }
     }
 
@@ -650,9 +662,6 @@ public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener
         discoverlock.writeLock().lock();
         try {
             result = discovercache.get(targetIp);
-            if (result != null) {
-                result.reset();
-            }
         } finally {
             discoverlock.writeLock().unlock();
         }
@@ -681,11 +690,11 @@ public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener
         }
     }
 
-    public class CacheData extends Cache {
+    public class CacheData {
         private MacAddress mac;
         private Object option;
         public CacheData(MacAddress mac, Object option) {
-            super(3600);
+            //super(3600);
             this.mac = mac;
             this.option = option;
         }
@@ -809,7 +818,7 @@ public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener
 
         @Override
         public Ethernet buildReply(Ethernet request) {
-            return ARP.buildArpReply((Ip4Address) targetIp, targetMac, request);
+            return ARP.buildArpReply(targetIp.getIp4Address(), targetMac, request);
         }
 
         @Override
@@ -868,7 +877,7 @@ public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener
 
         @Override
         public Ethernet buildReply(Ethernet request) {
-            Ethernet reply = NeighborAdvertisement.buildNdpAdv((Ip6Address) targetIp, targetMac, request);
+            Ethernet reply = NeighborAdvertisement.buildNdpAdv(targetIp.getIp6Address(), targetMac, request);
             IPv6 ipv6Pkt = (IPv6) reply.getPayload();
             ipv6Pkt.setHopLimit((byte) 0xff);
             ICMP6 icmp6Pkt = (ICMP6) ipv6Pkt.getPayload();
@@ -890,8 +899,8 @@ public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener
             dstmacbyte[3] = targetIpByte[13];
             dstmacbyte[4] = targetIpByte[14];
             dstmacbyte[5] = targetIpByte[15];
-            return NeighborSolicitation.buildNdpSolicit((Ip6Address) targetIp,
-                    (Ip6Address) senderIp,
+            return NeighborSolicitation.buildNdpSolicit(targetIp.getIp6Address(),
+                    senderIp.getIp6Address(),
                     Ip6Address.valueOf(dstipbyte),
                     senderMac,
                     MacAddress.valueOf(dstmacbyte),

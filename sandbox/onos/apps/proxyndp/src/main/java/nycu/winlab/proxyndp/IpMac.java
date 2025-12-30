@@ -6,10 +6,12 @@ import org.onlab.packet.IpAddress;
 public class IpMac {
     private final IpAddress ip;
     private final MacAddress mac;
+    private final MacAddress oldmac;
 
-    public IpMac(IpAddress ip, MacAddress mac) {
+    public IpMac(IpAddress ip, MacAddress mac, MacAddress oldmac) {
         this.ip = ip;
         this.mac = mac;
+        this.oldmac = oldmac;
     }
 
     public IpAddress getIp() {
@@ -18,6 +20,10 @@ public class IpMac {
 
     public MacAddress getMac() {
         return mac;
+    }
+
+    public MacAddress getOldMac() {
+        return oldmac;
     }
 }
 

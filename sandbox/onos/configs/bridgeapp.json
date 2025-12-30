@@ -4,15 +4,33 @@
       "BridgeAppACLConfig": {
         "input": [
           {
+            "dst": "${LAN_PREFIX_V4}.${ID}.1",
+            "rule": "deny"
+          },
+          {
+            "dst": "${LAN_PREFIX_V6}:${ID}::1",
+            "rule": "deny"
+          },
+          {
             "device": "ovs2",
             "port": 1,
             "dst": "${IX_PREFIX_V4}.${ID}",
+            "strict": true,
             "rule": "accept"
           },
           {
             "device": "ovs2",
             "port": 1,
             "dst": "${IX_PREFIX_V6}::${ID}",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "dst": "${IX_PREFIX_V6}::${ID}",
+            "strict": true,
+            "linklocal": true,
             "rule": "accept"
           },
           {
@@ -30,12 +48,22 @@
             "device": "of:0000164ce5257843",
             "port": 3,
             "dst": "${IX_PREFIX_V4}.${ID}",
+            "strict": true,
             "rule": "accept"
           },
           {
             "device": "of:0000164ce5257843",
             "port": 3,
             "dst": "${IX_PREFIX_V6}::${ID}",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "dst": "${IX_PREFIX_V6}::${ID}",
+            "strict": true,
+            "linklocal": true,
             "rule": "accept"
           },
           {
@@ -57,6 +85,30 @@
         ],
         "output": [
           {
+            "dst": "${LAN_PREFIX_V4}.${ID}.1",
+            "rule": "deny"
+          },
+          {
+            "dst": "${LAN_PREFIX_V6}:${ID}::1",
+            "rule": "deny"
+          },
+          {
+            "dst": "${IX_PREFIX_V4}.${ID}",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "dst": "${IX_PREFIX_V6}::${ID}",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "dst": "${IX_PREFIX_V6}::${ID}",
+            "strict": true,
+            "linklocal": true,
+            "rule": "accept"
+          },
+          {
             "device": "ovs2",
             "port": 1,
             "src": "${IX_PREFIX_V4}.${ID}",
@@ -106,6 +158,14 @@
             "device": "of:0000164ce5257843",
             "port": 2,
             "rule": "deny"
+          }
+        ]
+      },
+      "BridgeAppInitConfig": {
+        "hostentry": [
+          {
+            "mac": "d2:e0:74:31:de:15",
+            "port": -2
           }
         ]
       }
