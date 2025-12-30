@@ -4,6 +4,12 @@
       "BridgeAppACLConfig": {
         "input": [
           {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "dst": "${IX_PREFIX_V4}.${ID}",
+            "rule": "log"
+          },
+          {
             "dst": "${LAN_PREFIX_V4}.${ID}.1",
             "rule": "deny"
           },
@@ -42,6 +48,84 @@
           {
             "device": "ovs2",
             "port": 1,
+            "src": "${LAN_PREFIX_V4}.${ID}.1",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "src": "${TRANSIT_LINK_PREFIX_V4}.1",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "src": "${LAN_PREFIX_V6}:${ID}::1",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "src": "${TRANSIT_LINK_PREFIX_V6}::1",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 1,
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 5,
+            "dst": "${LEFT_PREFIX_V4}.${ID}",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 5,
+            "dst": "${LEFT_PREFIX_V6}::${ID}",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 5,
+            "dst": "${LEFT_PREFIX_V6}::${ID}",
+            "strict": true,
+            "linklocal": true,
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 5,
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 6,
+            "dst": "${RIGHT_PREFIX_V4}.${ID}",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 6,
+            "dst": "${RIGHT_PREFIX_V6}::${ID}",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 6,
+            "dst": "${RIGHT_PREFIX_V6}::${ID}",
+            "strict": true,
+            "linklocal": true,
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 6,
             "rule": "deny"
           },
           {
@@ -69,6 +153,33 @@
           {
             "device": "of:0000164ce5257843",
             "port": 3,
+            "rule": "deny"
+          },
+          {
+            "device": "ovs1",
+            "port": 4,
+            "dst": "${TRANSIT_LINK_PREFIX_V4}.1",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "device": "ovs1",
+            "port": 4,
+            "dst": "${TRANSIT_LINK_PREFIX_V6}::1",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "device": "ovs1",
+            "port": 4,
+            "dst": "${TRANSIT_LINK_PREFIX_V6}::1",
+            "strict": true,
+            "linklocal": true,
+            "rule": "accept"
+          },
+          {
+            "device": "ovs1",
+            "port": 4,
             "rule": "deny"
           },
           {
@@ -85,6 +196,12 @@
         ],
         "output": [
           {
+            "device": "of:0000164ce5257843",
+            "port": 3,
+            "src": "${IX_PREFIX_V4}.${ID}",
+            "rule": "log"
+          },
+          {
             "dst": "${LAN_PREFIX_V4}.${ID}.1",
             "rule": "deny"
           },
@@ -104,6 +221,54 @@
           },
           {
             "dst": "${IX_PREFIX_V6}::${ID}",
+            "strict": true,
+            "linklocal": true,
+            "rule": "accept"
+          },
+          {
+            "dst": "${LEFT_PREFIX_V4}.${ID}",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "dst": "${LEFT_PREFIX_V6}::${ID}",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "dst": "${LEFT_PREFIX_V6}::${ID}",
+            "strict": true,
+            "linklocal": true,
+            "rule": "accept"
+          },
+          {
+            "dst": "${RIGHT_PREFIX_V4}.${ID}",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "dst": "${RIGHT_PREFIX_V6}::${ID}",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "dst": "${RIGHT_PREFIX_V6}::${ID}",
+            "strict": true,
+            "linklocal": true,
+            "rule": "accept"
+          },
+          {
+            "dst": "${TRANSIT_LINK_PREFIX_V4}.1",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "dst": "${TRANSIT_LINK_PREFIX_V6}::1",
+            "strict": true,
+            "rule": "accept"
+          },
+          {
+            "dst": "${TRANSIT_LINK_PREFIX_V6}::1",
             "strict": true,
             "linklocal": true,
             "rule": "accept"
@@ -132,6 +297,40 @@
             "rule": "deny"
           },
           {
+            "device": "ovs2",
+            "port": 5,
+            "src": "${LEFT_PREFIX_V4}.${ID}",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 5,
+            "src": "${LEFT_PREFIX_V6}::${ID}",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 5,
+            "rule": "deny"
+          },
+          {
+            "device": "ovs2",
+            "port": 6,
+            "src": "${RIGHT_PREFIX_V4}.${ID}",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 6,
+            "src": "${RIGHT_PREFIX_V6}::${ID}",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs2",
+            "port": 6,
+            "rule": "deny"
+          },
+          {
             "device": "of:0000164ce5257843",
             "port": 3,
             "src": "${IX_PREFIX_V4}.${ID}",
@@ -146,6 +345,23 @@
           {
             "device": "of:0000164ce5257843",
             "port": 3,
+            "rule": "deny"
+          },
+          {
+            "device": "ovs1",
+            "port": 4,
+            "src": "${TRANSIT_LINK_PREFIX_V4}.1",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs1",
+            "port": 4,
+            "src": "${TRANSIT_LINK_PREFIX_V6}::1",
+            "rule": "accept"
+          },
+          {
+            "device": "ovs1",
+            "port": 4,
             "rule": "deny"
           },
           {

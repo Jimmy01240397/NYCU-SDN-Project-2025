@@ -2,23 +2,23 @@
   "apps": {
     "nycu.winlab.routerapp": { 
       "RouterAppConfig": {
+        "defaultconnect": "${IX_PREFIX_V4}.${ID}/24",
+        "defaultlinklocal": "fe80::d2e0:74ff:ef31:de15",
+        "ixpeerv4": "${IX_PREFIX_V4}.253",
+        "ixpeerv6": "${IX_PREFIX_V6}::fe",
         "connects": [
           "${LAN_PREFIX_V4}.${ID}.1/24",
           "${IX_PREFIX_V4}.${ID}/24",
           "${TRANSIT_LINK_PREFIX_V4}.1/24",
-          "${LAN_PREFIX_V6}:39::69/64",
+          "${LAN_PREFIX_V6}:${ID}::1/64",
           "${IX_PREFIX_V6}::${ID}/64",
-          "${TRANSIT_LINK_PREFIX_V6}::1/64"
+          "${TRANSIT_LINK_PREFIX_V6}::1/64",
+          "${LEFT_PREFIX_V4}.${ID}/24",
+          "${RIGHT_PREFIX_V4}.${ID}/24",
+          "${LEFT_PREFIX_V6}::${ID}/64",
+          "${RIGHT_PREFIX_V6}::${ID}/64"
         ],
         "routes": [
-          {
-            "prefix": "0.0.0.0/0",
-            "gateway": "${IX_PREFIX_V4}.253"
-          },
-          {
-            "prefix": "::/0",
-            "gateway": "${IX_PREFIX_V6}::fe"
-          }
         ]
       }
     }

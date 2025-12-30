@@ -5,11 +5,11 @@ services:
     image: sdnproject
     build: .
     volumes:
-    - ./sandbox:/sandbox
+    - ./sandbox:/sandbox:ro
     - ./images:/images
-    - ./init.sh:/init.sh
-    - ./wg.conf:/etc/wireguard/wg.conf
-    - ./daemon.json:/etc/docker/daemon.json
+    - ./init.sh:/init.sh:ro
+    - ./wg.conf:/etc/wireguard/wg.conf:ro
+    - ./daemon.json:/etc/docker/daemon.json:ro
     sysctls:
     - net.ipv4.ip_forward=1
     - net.ipv6.conf.default.forwarding=1
@@ -26,18 +26,16 @@ services:
     - IX_PREFIX_V6=fd70
     - TRANSIT_PREFIX_V4=172.17
     - TRANSIT_PREFIX_V6=2a0b:4e07:c4:1
-    - LEFT_VNI=
-    - LEFT_REMOTE_IP=
-    - LEFT_IP_V4=
-    - LEFT_IP_V6=
-    - LEFT_PEER_IP_V4=
-    - LEFT_PEER_IP_V6=
-    - RIGHT_VNI=
-    - RIGHT_REMOTE_IP=
-    - RIGHT_IP_V4=
-    - RIGHT_IP_V6=
-    - RIGHT_PEER_IP_V4=
-    - RIGHT_PEER_IP_V6=
+    - LEFT_ID=37
+    - LEFT_VNI=40
+    - LEFT_REMOTE_IP=192.168.61.37
+    - LEFT_PREFIX_V4=192.168.87
+    - LEFT_PREFIX_V6=fd87
+    - RIGHT_ID=40
+    - RIGHT_VNI=50
+    - RIGHT_REMOTE_IP=192.168.61.40
+    - RIGHT_PREFIX_V4=192.168.88
+    - RIGHT_PREFIX_V6=fd88
     privileged: true
     ports:
     - 8181:8181

@@ -422,11 +422,13 @@ public class BridgeApp {
                             HostEntry hostentry = hostentrys.get(i);
                             if (hostentry.getDeviceId() != null) {
                                 DeviceId deviceId = hostentry.getDeviceId();
+                                log.info("BridgeAppConfigListener newhostentry");
                                 newhostentry(hostentry.getMac(), deviceId, hostentry.getPort());
                                 continue;
                             }
                             for (Device device : deviceService.getDevices()) {
                                 DeviceId deviceId = device.id();
+                                log.info("BridgeAppConfigListener newhostentry");
                                 newhostentry(hostentry.getMac(), deviceId, hostentry.getPort());
                             }
                         }
@@ -584,8 +586,7 @@ public class BridgeApp {
         MacAddress srcmac = ethPkt.getSourceMAC();
         PortNumber fromport = pkt.receivedFrom().port();
         DeviceId deviceId = pkt.receivedFrom().deviceId();
-        boolean run = (ethPkt.getEtherType() != Ethernet.TYPE_IPV4 &&
-                       ethPkt.getEtherType() != Ethernet.TYPE_IPV6);
+        boolean run = (ethPkt.getEtherType() == Ethernet.TYPE_ARP);
         if (!run) {
             if (ethPkt.getEtherType() == Ethernet.TYPE_IPV4) {
                 IPv4 ipv4Pkt = (IPv4) ethPkt.getPayload();
@@ -600,7 +601,37 @@ public class BridgeApp {
             }
         }
         if (run) {
-            newhostentry(srcmac, deviceId, fromport);
+            newhostentry(ethPkt, srcmac, deviceId, fromport);
+        }
+    }
+
+    public void newhostentry(Ethernet ethPkt, MacAddress mac, DeviceId deviceId, PortNumber port) {
+        lock.writeLock().lock();
+        try {
+            Map<MacAddress, HostEntry> mactable = mactables.get(deviceId);
+            if (mactable == null) {
+                mactable = new HashMap<>();
+                mactables.put(deviceId, mactable);
+            }
+            HostEntry entry = new HostEntry(deviceId, port, mac);
+            if (!entry.equals(mactable.get(mac))) {
+                mactable.put(mac, entry);
+                IpAddress sip = null;
+                IpAddress dip = null;
+                if (ethPkt.getEtherType() == Ethernet.TYPE_IPV4) {
+                    IPv4 ipv4Pkt = (IPv4) ethPkt.getPayload();
+                    sip = Ip4Address.valueOf(ipv4Pkt.getSourceAddress());
+                    dip = Ip4Address.valueOf(ipv4Pkt.getDestinationAddress());
+                } else if (ethPkt.getEtherType() == Ethernet.TYPE_IPV6) {
+                    IPv6 ipv6Pkt = (IPv6) ethPkt.getPayload();
+                    sip = Ip6Address.valueOf(ipv6Pkt.getSourceAddress());
+                    dip = Ip6Address.valueOf(ipv6Pkt.getDestinationAddress());
+                }
+                log.info("Add an entry to the port table of `{}`. MAC address: `{}` sip {} dip {} => Port: `{}`.",
+                        deviceId, mac, sip, dip, port);
+            }
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 
@@ -674,6 +705,7 @@ public class BridgeApp {
                     }
 
                     if (gethostentry(neighbor, mac) == null) {
+                        log.info("buildhostentry newhostentry");
                         newhostentry(mac, neighbor, ingressPort);
                     }
 

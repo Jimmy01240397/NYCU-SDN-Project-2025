@@ -11,8 +11,7 @@ services:
       context: ./frr
       dockerfile: Dockerfile
     volumes:
-    - ./routeserver/frr:/etc/frr
-    #- ./tmp/routeserver/frr:/etc/frr
+    - /tmp/routeserver/frr:/etc/frr:ro
     - ./routeserver:/setup:ro
     - ./routeserver/ssh:/root/.ssh:ro
     command: "/bin/bash /setup/start.sh"
@@ -60,6 +59,7 @@ services:
     environment:
     - ONOS_APPS=drivers,fpm,openflow,gui2
     ports:
+    - 2620:2620
     - 6653:6653
     - 8181:8181
     privileged: true
@@ -84,8 +84,7 @@ services:
     - net.ipv6.conf.all.proxy_ndp=1
     - net.ipv6.conf.all.accept_ra=2
     volumes:
-    - ./transitrouter/frr:/etc/frr
-    #- ./tmp/transitrouter/frr:/etc/frr
+    - /tmp/transitrouter/frr:/etc/frr:ro
     - ./transitrouter:/setup:ro
     - ./transitrouter/ssh:/root/.ssh:ro
     command: "/bin/bash /setup/start.sh"

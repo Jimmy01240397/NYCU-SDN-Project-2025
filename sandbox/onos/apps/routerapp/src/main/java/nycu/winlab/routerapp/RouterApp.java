@@ -66,10 +66,16 @@ import org.onosproject.routeservice.RouteService;
 import org.onosproject.routeservice.RouteListener;
 import org.onosproject.routeservice.RouteEvent;
 import org.onosproject.routeservice.ResolvedRoute;
+import org.onosproject.routeservice.RouteInfo;
+import org.onosproject.routeservice.RouteTableId;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Device;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import org.onlab.util.Tools;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.MacAddress;
 import org.onlab.packet.IPv4;
@@ -84,8 +90,9 @@ import java.util.Properties;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Set;
 import java.util.HashMap;
-import java.util.Optional;
+import java.util.Collection;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.nio.ByteBuffer;
@@ -152,7 +159,13 @@ public class RouterApp {
 
     private RoutePacketProcessor processor;
 
+    private ScheduledExecutorService executor;
+
     private List<IpInfo> connects = new ArrayList<>();
+    private IpInfo defaultconnect = null;
+    private IpAddress defaultlinklocal = null;
+    private IpAddress ixpeerv4 = null;
+    private IpAddress ixpeerv6 = null;
 
     private Map<IpPrefix, TrafficSelector> mactoselector = new HashMap<>();
 
@@ -173,12 +186,21 @@ public class RouterApp {
         deviceService.addListener(devicelistener);
         cfgService.addListener(cfgListener);
         cfgService.registerConfigFactory(factory);
+
+        executor = Executors.newSingleThreadScheduledExecutor(Tools.groupedThreads(
+                    "nycu.winlab.routerapp",
+                    "ixndp",
+                    log));
+        executor.scheduleAtFixedRate(this::ixndp, 0, 1, TimeUnit.SECONDS);
     }
 
     @Deactivate
     protected void deactivate() {
         if (coreService == null || packetService == null) {
             return;
+        }
+        if (executor != null) {
+            executor.shutdownNow();
         }
         cfgService.removeListener(cfgListener);
         cfgService.unregisterConfigFactory(factory);
@@ -195,6 +217,122 @@ public class RouterApp {
     @Modified
     public void modified(ComponentContext context) {
         Dictionary<?, ?> properties = context != null ? context.getProperties() : new Properties();
+    }
+
+    private void ixndp() {
+        ProxyNDP.CacheData dstmaccheck = null;
+        ProxyNDP.CacheData srcmaccheck = null;
+        IpInfo useconnect = null;
+        try {
+            for (IpInfo tmp : connects) {
+                if (tmp.getPrefix().contains(ixpeerv4)) {
+                    useconnect = tmp;
+                    break;
+                }
+            }
+            if (useconnect != null) {
+                srcmaccheck = proxyndp.getdiscovercache(useconnect.getAddress());
+                dstmaccheck = proxyndp.getdiscovercache(ixpeerv4);
+                if (srcmaccheck != null && dstmaccheck != null) {
+                    log.info("Send ndp reply for ix {} {} {} {}",
+                        ixpeerv4,
+                        dstmaccheck.getMac(),
+                        useconnect.getAddress(),
+                        srcmaccheck.getMac());
+                    proxyndp.sendreply(
+                        ixpeerv4,
+                        dstmaccheck.getMac(),
+                        useconnect.getAddress(),
+                        srcmaccheck.getMac());
+                }
+            }
+            useconnect = null;
+            for (IpInfo tmp : connects) {
+                if (tmp.getPrefix().contains(ixpeerv6)) {
+                    useconnect = tmp;
+                    break;
+                }
+            }
+            if (useconnect != null) {
+                srcmaccheck = proxyndp.getdiscovercache(useconnect.getAddress());
+                dstmaccheck = proxyndp.getdiscovercache(ixpeerv6);
+                if (srcmaccheck != null && dstmaccheck != null) {
+                    log.info("Send ndp reply for ix {} {} {} {}",
+                        ixpeerv6,
+                        dstmaccheck.getMac(),
+                        useconnect.getAddress(),
+                        srcmaccheck.getMac());
+                    proxyndp.sendreply(
+                        ixpeerv6,
+                        dstmaccheck.getMac(),
+                        useconnect.getAddress(),
+                        srcmaccheck.getMac());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("IX NDP failed", e);
+        }
+    }
+
+    private ResolvedRoute longestPrefixLookup(IpAddress ip) {
+        Collection<RouteInfo> routes = null;
+        if (ip.isIp4()) {
+            routes = routeService.getRoutes(new RouteTableId("ipv4"));
+        } else if (ip.isIp6()) {
+            routes = routeService.getRoutes(new RouteTableId("ipv6"));
+        } else {
+            return null;
+        }
+        int prefixlen = -1;
+        RouteInfo choose = null;
+        for (RouteInfo routeinfo : routes) {
+            if (routeinfo.prefix().contains(ip) && routeinfo.prefix().prefixLength() > prefixlen) {
+                choose = routeinfo;
+                prefixlen = routeinfo.prefix().prefixLength();
+            }
+        }
+        if (prefixlen < 0) {
+            return null;
+        }
+        if (choose.bestRoute().isPresent()) {
+            return choose.bestRoute().get();
+        }
+        Set<ResolvedRoute> allroutes = choose.allRoutes();
+        if (allroutes.size() <= 0) {
+            return null;
+        }
+        for (ResolvedRoute nowroute : allroutes) {
+            ProxyNDP.CacheData dstmaccheck = proxyndp.getdiscovercache(nowroute.nextHop());
+            if (dstmaccheck != null) {
+                return nowroute;
+            }
+
+            IpInfo useconnect = null;
+            for (IpInfo tmp : connects) {
+                if (tmp.getPrefix().contains(nowroute.nextHop())) {
+                    useconnect = tmp;
+                    break;
+                }
+            }
+            if (useconnect == null) {
+                useconnect = defaultconnect;
+            }
+            IpAddress nexthop = nowroute.nextHop();
+            ProxyNDP.CacheData srcmaccheck = proxyndp.getdiscovercache(useconnect.getAddress());
+            if (srcmaccheck == null) {
+                log.info("Route new src mac not find {}", nowroute);
+                return null;
+            }
+            if (dstmaccheck == null) {
+                log.info("Route new dst mac not find {}", nowroute);
+                IpAddress connectaddress = useconnect.getAddress();
+                if (nowroute.nextHop().isIp6()) {
+                    connectaddress = Ip6Address.valueOf("fe80::d2e0:74ff:ef31:de15");
+                }
+                proxyndp.sendrequest(connectaddress, srcmaccheck.getMac(), nexthop);
+            }
+        }
+        return allroutes.iterator().next();
     }
 
     private class RoutePacketProcessor implements PacketProcessor {
@@ -231,7 +369,10 @@ public class RouterApp {
                 sip = Ip6Address.valueOf(ipPkt.getSourceAddress());
                 dip = Ip6Address.valueOf(ipPkt.getDestinationAddress());
             }
-            ProxyNDP.CacheData dstmaccheck = proxyndp.getdiscovercache(dip);
+            ProxyNDP.CacheData dstmaccheck = null;
+            ProxyNDP.CacheData srcmaccheck = null;
+            IpInfo useconnect = null;
+            dstmaccheck = proxyndp.getdiscovercache(dip);
             if (dstmaccheck != null && dstmaccheck.getMac().equals(dstmac)) {
                 return;
             }
@@ -245,7 +386,7 @@ public class RouterApp {
             if (!doroute) {
                 return;
             }
-            IpInfo useconnect = null;
+            useconnect = null;
             for (IpInfo tmp : connects) {
                 if (tmp.getPrefix().contains(dip)) {
                     useconnect = tmp;
@@ -254,11 +395,12 @@ public class RouterApp {
             }
             ResolvedRoute route = null;
             if (useconnect == null) {
-                Optional<ResolvedRoute> result = routeService.longestPrefixLookup(dip);
-                if (!result.isPresent()) {
+                route = longestPrefixLookup(dip);
+                if (route == null) {
+                    log.info("Route unmatch {}", dip);
                     return;
                 }
-                route = result.get();
+                log.info("Route match {} {}", dip, route);
                 for (IpInfo tmp : connects) {
                     if (tmp.getPrefix().contains(route.nextHop())) {
                         useconnect = tmp;
@@ -267,19 +409,27 @@ public class RouterApp {
                 }
             }
             if (useconnect == null) {
-                return;
+                log.info("Route connect unmatch usedefault {} {}",
+                        dip, route);
+                useconnect = defaultconnect;
             }
             IpAddress nexthop = dip;
             if (route != null) {
                 nexthop = route.nextHop();
             }
             dstmaccheck = proxyndp.getdiscovercache(nexthop);
-            ProxyNDP.CacheData srcmaccheck = proxyndp.getdiscovercache(useconnect.getAddress());
+            srcmaccheck = proxyndp.getdiscovercache(useconnect.getAddress());
             if (srcmaccheck == null) {
+                log.info("Route new src mac not find {} {}", dip, route);
                 return;
             }
             if (dstmaccheck == null) {
-                proxyndp.sendrequest(useconnect.getAddress(), srcmaccheck.getMac(), nexthop);
+                log.info("Route new dst mac not find {} {}", dip, route);
+                IpAddress connectaddress = useconnect.getAddress();
+                if (nexthop.isIp6()) {
+                    connectaddress = defaultlinklocal;
+                }
+                proxyndp.sendrequest(connectaddress, srcmaccheck.getMac(), nexthop);
                 return;
             }
             addrule(context, route, useconnect);
@@ -335,6 +485,7 @@ public class RouterApp {
             try {
                 neweth = Ethernet.deserializer().deserialize(ethPkt.serialize(), 0, ethPkt.serialize().length);
             } catch (Exception e) {
+                log.info("Wtf");
                 return;
             }
 
@@ -465,13 +616,11 @@ public class RouterApp {
             TrafficSelector selector = mactoselector.remove(prefix);
             if (selector != null) {
                 for (Device device : deviceService.getDevices()) {
-                    ForwardingObjective forwardingObjective = DefaultForwardingObjective.builder().
-                        withSelector(selector).
-                        withPriority(ROUTEPRIORITY).
-                        withFlag(ForwardingObjective.Flag.VERSATILE).
-                        fromApp(appId).
-                        remove();
-                    flowObjectiveService.forward(device.id(), forwardingObjective);
+                    for (FlowRule flow : flowRuleService.getFlowEntries(device.id())) {
+                        if (flow.appId() == appId.id() && flow.selector().equals(selector)) {
+                            flowRuleService.removeFlowRules(flow);
+                        }
+                    }
                 }
             }
         } finally {
@@ -496,7 +645,11 @@ public class RouterApp {
                 if (event.configClass().equals(RouterAppConfig.class)) {
                     RouterAppConfig config = cfgService.getConfig(appId, RouterAppConfig.class);
                     if (config != null) {
+                        defaultconnect = config.getDefaultConnect();
                         connects = config.getConnects();
+                        defaultlinklocal = config.getDefaultLinkLocal();
+                        ixpeerv4 = config.getIxPeerV4();
+                        ixpeerv6 = config.getIxPeerV6();
                         reloadbaseflow();
                     }
                 }
@@ -565,11 +718,14 @@ public class RouterApp {
             ResolvedRoute route = event.subject();
             switch (event.type()) {
                 case ROUTE_ADDED:
+                    log.info("Route add {}", route);
                     break;
                 case ROUTE_REMOVED:
+                    log.info("Route remove {}", route);
                     removerouteflow(route.prefix());
                     break;
                 case ROUTE_UPDATED:
+                    log.info("Route update {}", route);
                     removerouteflow(route.prefix());
                     break;
                 default:

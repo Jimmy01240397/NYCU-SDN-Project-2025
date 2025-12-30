@@ -13,14 +13,6 @@ export TAPREFIX="$(cat /etc/wireguard/wg.conf | grep -oP '(?<=AllowedIPs = ).*(?
 
 ovs-vsctl add-port ovs2 tota -- set interface tota type=vxlan options:remote_ip=${TAPREFIX}.${ID}
 
-if [ "${LEFT_VNI}" != "" ]
-then
-    ovs-vsctl add-port ovs2 toleft -- set interface toleft type=vxlan options:remote_ip=${LEFT_REMOTE_IP} options:key=${LEFT_VNI}
-fi
-if [ "${RIGHT_VNI}" != "" ]
-then
-    ovs-vsctl add-port ovs2 toright -- set interface toright type=vxlan options:remote_ip=${RIGHT_REMOTE_IP} options:key=${RIGHT_VNI}
-fi
 
 ip link add ovs1toovs2 type veth peer name ovs2toovs1
 ip link set ovs1toovs2 up
@@ -65,6 +57,22 @@ do
     done
 done
 
+mkdir -p /tmp/transitrouter
+cp -r /sandbox/transitrouter/frr/ /tmp/transitrouter/frr
+
+for a in $(ls /tmp/transitrouter/frr)
+do
+    for b in $(env)
+    do
+        key="${b%%=*}"
+        value="${b#*=}"
+        key_esc=$(printf '%s' "${key}" | sed 's/[.[\*^$\/]/\\&/g')
+        search="\${${key_esc}}"
+        val_esc=$(printf '%s' "${value}" | sed 's/[&/]/\\&/g')
+        sed -i "s/${search}/${val_esc}/g" "/tmp/transitrouter/frr/$a"
+    done
+done
+
 docker compose -p sandbox up -d
 
 ip link add ovs2todummy type veth peer name dummytoovs2
@@ -83,7 +91,7 @@ docker compose exec host2 ip link set eth0 mtu ${MTU}
 docker compose exec host2 ip -6 addr add ${LAN_PREFIX_V6}:${ID}::3/64 dev eth0
 docker compose exec host2 ip -6 route add default via ${LAN_PREFIX_V6}:${ID}::1 dev eth0
 
-ovs-docker add-port ovs1 eth0 sandbox-routeserver-1 --ipaddress=${LAN_PREFIX_V4}.${ID}.69/24 --gateway=${LAN_PREFIX_V4}.${ID}.1
+ovs-docker add-port ovs1 eth0 sandbox-routeserver-1 --ipaddress=${LAN_PREFIX_V4}.${ID}.69/24 --gateway=${LAN_PREFIX_V4}.${ID}.1 --macaddress=d2:e0:74:9b:5e:${ID}
 docker compose exec routeserver ip link set eth0 mtu ${MTU}
 docker compose exec routeserver ip -4 addr add ${TRANSIT_LINK_PREFIX_V4}.1/24 dev eth0
 docker compose exec routeserver ip -4 addr add ${IX_PREFIX_V4}.${ID}/24 dev eth0
@@ -93,20 +101,22 @@ docker compose exec routeserver ip -6 addr add ${IX_PREFIX_V6}::${ID}/64 dev eth
 docker compose exec routeserver ip -6 addr add ${LAN_PREFIX_V6}:${ID}::69/64 dev eth0
 docker compose exec routeserver ip -6 route add default via ${LAN_PREFIX_V6}:${ID}::1 dev eth0
 
-if [ "${LEFT_VNI}" != "" ]
-then
-    docker compose exec routeserver ip -4 addr add ${LEFT_IP_V4}/24 dev eth0
-    docker compose exec routeserver ip -6 addr add ${LEFT_IP_V6}/64 dev eth0
-fi
-if [ "${RIGHT_VNI}" != "" ]
-then
-    docker compose exec routeserver ip -4 addr add ${RIGHT_IP_V4}/24 dev eth0
-    docker compose exec routeserver ip -6 addr add ${RIGHT_IP_V6}/64 dev eth0
-fi
-
 ovs-docker add-port ovs1 eth1 sandbox-transitrouter-1 --ipaddress=${TRANSIT_LINK_PREFIX_V4}.2/24
 docker compose exec transitrouter ip link set eth1 mtu ${MTU}
 docker compose exec transitrouter ip -6 addr add ${TRANSIT_LINK_PREFIX_V6}::2/64 dev eth1
+
+if [ "${LEFT_VNI}" != "" ]
+then
+    ovs-vsctl add-port ovs2 toleft -- set interface toleft type=vxlan options:remote_ip=${LEFT_REMOTE_IP} options:key=${LEFT_VNI}
+    docker compose exec routeserver ip -4 addr add ${LEFT_PREFIX_V4}.${ID}/24 dev eth0
+    docker compose exec routeserver ip -6 addr add ${LEFT_PREFIX_V6}::${ID}/64 dev eth0
+fi
+if [ "${RIGHT_VNI}" != "" ]
+then
+    ovs-vsctl add-port ovs2 toright -- set interface toright type=vxlan options:remote_ip=${RIGHT_REMOTE_IP} options:key=${RIGHT_VNI}
+    docker compose exec routeserver ip -4 addr add ${RIGHT_PREFIX_V4}.${ID}/24 dev eth0
+    docker compose exec routeserver ip -6 addr add ${RIGHT_PREFIX_V6}::${ID}/64 dev eth0
+fi
 
 
 

@@ -14,12 +14,33 @@ import java.util.ArrayList;
 public class RouterAppConfig
         extends Config<ApplicationId> {
 
+    public static final String DEFAULTCONNECT = "defaultconnect";
+    public static final String DEFAULTLINKLOCAL = "defaultlinklocal";
+    public static final String IXPEERV4 = "ixpeerv4";
+    public static final String IXPEERV6 = "ixpeerv6";
     public static final String CONNECTS = "connects";
     public static final String ROUTES = "routes";
 
     @Override
     public boolean isValid() {
-        return hasOnlyFields(CONNECTS, ROUTES);
+        return hasOnlyFields(DEFAULTCONNECT, DEFAULTLINKLOCAL, IXPEERV4, IXPEERV6, CONNECTS, ROUTES);
+    }
+
+    public IpInfo getDefaultConnect() {
+        return new IpInfo(IpAddress.valueOf(object.get(DEFAULTCONNECT).asText().split("/")[0]),
+            IpPrefix.valueOf(object.get(DEFAULTCONNECT).asText()));
+    }
+
+    public IpAddress getDefaultLinkLocal() {
+        return IpAddress.valueOf(object.get(DEFAULTLINKLOCAL).asText());
+    }
+
+    public IpAddress getIxPeerV4() {
+        return IpAddress.valueOf(object.get(IXPEERV4).asText());
+    }
+
+    public IpAddress getIxPeerV6() {
+        return IpAddress.valueOf(object.get(IXPEERV6).asText());
     }
 
     public List<IpInfo> getConnects() {

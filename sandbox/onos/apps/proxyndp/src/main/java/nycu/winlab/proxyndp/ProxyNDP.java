@@ -447,6 +447,47 @@ public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener
         }
     }
 
+    public void sendreply(IpAddress sender, MacAddress sendermac, IpAddress target, MacAddress targetmac) {
+        DiscoverEntry discoverentry = null;
+        if (target.isIp4()) {
+            discoverentry = new ArpEntry(sender, sendermac, target, MacAddress.ZERO);
+        } else if (target.isIp6()) {
+            discoverentry = new NdpEntry(sender, sendermac, target, MacAddress.ZERO);
+        }
+        Ethernet ethPkt = discoverentry.buildRequest();
+        discoverentry.setTargetMac(targetmac);
+        ethPkt = discoverentry.buildReply(ethPkt);
+
+        byte[] data = ethPkt.serialize();
+
+        Set<ConnectPoint> nonEdge = new HashSet<>();
+        for (Link link : linkService.getLinks()) {
+            nonEdge.add(link.src());
+            nonEdge.add(link.dst());
+        }
+        for (Device device : deviceService.getDevices()) {
+            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+            for (Port port : deviceService.getPorts(device.id())) {
+                ConnectPoint outpoint = new ConnectPoint(device.id(), port.number());
+                if (port.number().equals(PortNumber.LOCAL) ||
+                    nonEdge.contains(outpoint)) {
+                    continue;
+                }
+                if (!aclcheck(ethPkt, outpoint, "output", discoverentry, false)) {
+                    continue;
+                }
+                log.info("log point {}", outpoint);
+                treatment.setOutput(port.number());
+            }
+            OutboundPacket outPkt = new DefaultOutboundPacket(
+                    device.id(),
+                    treatment.build(),
+                    ByteBuffer.wrap(data)
+            );
+            packetService.emit(outPkt);
+        }
+    }
+
     public void sendrequest(IpAddress sender, MacAddress sendermac, IpAddress target) {
         DiscoverEntry discoverentry = null;
         if (target.isIp4()) {
@@ -474,6 +515,7 @@ public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener
                 if (!aclcheck(ethPkt, outpoint, "output", discoverentry, true)) {
                     continue;
                 }
+                log.info("log point {}", outpoint);
                 treatment.setOutput(port.number());
             }
             OutboundPacket outPkt = new DefaultOutboundPacket(
@@ -899,12 +941,15 @@ public class ProxyNDP extends AbstractListenerManager<MacEvent, MacEventListener
             dstmacbyte[3] = targetIpByte[13];
             dstmacbyte[4] = targetIpByte[14];
             dstmacbyte[5] = targetIpByte[15];
-            return NeighborSolicitation.buildNdpSolicit(targetIp.getIp6Address(),
+            Ethernet result = NeighborSolicitation.buildNdpSolicit(targetIp.getIp6Address(),
                     senderIp.getIp6Address(),
                     Ip6Address.valueOf(dstipbyte),
                     senderMac,
                     MacAddress.valueOf(dstmacbyte),
                     VlanId.NONE);
+            IPv6 ipv6Pkt = (IPv6) result.getPayload();
+            ipv6Pkt.setNextHeader(IPv6.PROTOCOL_ICMP6);
+            return result;
         }
 
         @Override
