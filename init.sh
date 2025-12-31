@@ -118,5 +118,15 @@ then
     docker compose exec routeserver ip -6 addr add ${RIGHT_PREFIX_V6}::${ID}/64 dev eth0
 fi
 
+ovs-docker add-port ovs1 eth0 sandbox-web1-1 --ipaddress=${LAN_PREFIX_V4}.${ID}.10/24 --gateway=${LAN_PREFIX_V4}.${ID}.1 --macaddress=d2:e0:74:5b:61:76
+PID=$(docker inspect -f '{{.State.Pid}}' sandbox-web1-1)
+nsenter -t ${PID} -n ip link set eth0 mtu ${MTU}
+nsenter -t ${PID} -n ip -6 addr add ${LAN_PREFIX_V6}:${ID}::10/64 dev eth0
+nsenter -t ${PID} -n ip -6 route add default via ${LAN_PREFIX_V6}:${ID}::1 dev eth0
 
+ovs-docker add-port ovs2 eth0 sandbox-web2-1 --ipaddress=${LAN_PREFIX_V4}.${ID}.10/24 --gateway=${LAN_PREFIX_V4}.${ID}.1 --macaddress=d2:e0:74:50:16:c8
+PID=$(docker inspect -f '{{.State.Pid}}' sandbox-web2-1)
+nsenter -t ${PID} -n ip link set eth0 mtu ${MTU}
+nsenter -t ${PID} -n ip -6 addr add ${LAN_PREFIX_V6}:${ID}::10/64 dev eth0
+nsenter -t ${PID} -n ip -6 route add default via ${LAN_PREFIX_V6}:${ID}::1 dev eth0
 

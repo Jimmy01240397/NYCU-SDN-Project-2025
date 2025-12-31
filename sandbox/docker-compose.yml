@@ -44,6 +44,20 @@ services:
     - ./host/ssh:/root/.ssh:ro
     command: "/bin/bash /setup/start.sh"
     network_mode: "none"
+  web1:
+    image: 'traefik/whoami:latest'
+    cap_add:
+    - NET_RAW
+    - NET_ADMIN
+    - SYS_ADMIN
+    network_mode: "none"
+  web2:
+    image: 'traefik/whoami:latest'
+    cap_add:
+    - NET_RAW
+    - NET_ADMIN
+    - SYS_ADMIN
+    network_mode: "none"
   onos:
     image: onos
     build:

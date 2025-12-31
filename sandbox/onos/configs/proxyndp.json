@@ -305,6 +305,34 @@
             "data": "d2:e0:74:31:de:15"
           },
           {
+            "device": "ovs1",
+            "type": "request",
+            "target": "${LAN_PREFIX_V4}.${ID}.10/32",
+            "rule": "replytargetmac",
+            "data": "d2:e0:74:5b:61:76"
+          },
+          {
+            "device": "ovs1",
+            "type": "request",
+            "target": "${LAN_PREFIX_V6}:${ID}::10/128",
+            "rule": "replytargetmac",
+            "data": "d2:e0:74:5b:61:76"
+          },
+          {
+            "device": "ovs2",
+            "type": "request",
+            "target": "${LAN_PREFIX_V4}.${ID}.10/32",
+            "rule": "replytargetmac",
+            "data": "d2:e0:74:50:16:c8"
+          },
+          {
+            "device": "ovs2",
+            "type": "request",
+            "target": "${LAN_PREFIX_V6}:${ID}::10/128",
+            "rule": "replytargetmac",
+            "data": "d2:e0:74:50:16:c8"
+          },
+          {
             "type": "reply",
             "sender": "fe80::/64",
             "target": "fe80::/64",
